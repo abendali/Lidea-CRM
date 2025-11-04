@@ -36,6 +36,12 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
 });
 
+export const users = pgTable("users", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
 export const insertProductSchema = createInsertSchema(products, {
   estimatedPrice: z.number().min(0),
   stock: z.number().int().min(0),
@@ -67,3 +73,13 @@ export type InsertCashflow = z.infer<typeof insertCashflowSchema>;
 export type Cashflow = typeof cashflows.$inferSelect;
 
 export type Setting = typeof settings.$inferSelect;
+
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().min(3).max(50),
+  password: z.string().min(6),
+}).omit({
+  id: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;

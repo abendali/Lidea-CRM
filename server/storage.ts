@@ -5,8 +5,14 @@ import {
   type InsertStockMovement,
   type Cashflow,
   type InsertCashflow,
-  type Setting
+  type Setting,
+  type User,
+  type InsertUser
 } from "@shared/schema";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+
+const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   // Products
@@ -29,6 +35,14 @@ export interface IStorage {
   // Settings
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
+
+  // Users
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
+  // Session store
+  sessionStore: session.SessionStore;
 }
 
 export class MemStorage implements IStorage {
@@ -36,11 +50,21 @@ export class MemStorage implements IStorage {
   private stockMovements: Map<number, StockMovement> = new Map();
   private cashflows: Map<number, Cashflow> = new Map();
   private settings: Map<string, Setting> = new Map();
+  private users: Map<number, User> = new Map();
   
   private productIdCounter = 1;
   private stockMovementIdCounter = 1;
   private cashflowIdCounter = 1;
   private settingIdCounter = 1;
+  private userIdCounter = 1;
+
+  sessionStore: session.SessionStore;
+
+  constructor() {
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000,
+    });
+  }
 
   // Products
   async getAllProducts(): Promise<Product[]> {
@@ -146,6 +170,24 @@ export class MemStorage implements IStorage {
       this.settings.set(key, setting);
       return setting;
     }
+  }
+
+  // Users
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.username === username);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const user: User = {
+      id: this.userIdCounter++,
+      ...insertUser,
+    };
+    this.users.set(user.id, user);
+    return user;
   }
 }
 

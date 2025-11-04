@@ -1,4 +1,4 @@
-import { Home, Package, DollarSign, Settings, User } from "lucide-react";
+import { Home, Package, DollarSign, Settings, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 
 const items = [
@@ -32,7 +33,16 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { user, logoutMutation } = useAuth();
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        setLocation("/auth");
+      },
+    });
+  };
 
   return (
     <Sidebar>
@@ -67,14 +77,18 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={location === "/profile"} data-testid="link-profile">
-              <Link href="/profile">
-                <User />
-                <span>Profile</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {user && (
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                onClick={handleLogout} 
+                disabled={logoutMutation.isPending}
+                data-testid="button-logout"
+              >
+                <LogOut />
+                <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
