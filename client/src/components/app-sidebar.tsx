@@ -1,15 +1,17 @@
-import { Home, Package, DollarSign } from "lucide-react";
+import { Home, Package, DollarSign, Settings, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import logoUrl from "@assets/logo-lidea_1762250027138.png";
 
 const items = [
   {
@@ -34,9 +36,11 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
+      <SidebarHeader className="p-4">
+        <img src={logoUrl} alt="LiDEA" className="w-32 h-auto" data-testid="img-logo" />
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Store Management</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -53,6 +57,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-settings">
+              <Link href="/settings">
+                <Settings />
+                <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={location === "/profile"} data-testid="link-profile">
+              <Link href="/profile">
+                <User />
+                <span>Profile</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

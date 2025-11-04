@@ -34,11 +34,10 @@ export default function App() {
           <div className="flex h-screen w-full">
             <AppSidebar />
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between p-4 border-b">
+              <header className="flex items-center gap-4 p-4 border-b">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <div className="text-lg font-semibold">Store Management System</div>
               </header>
-              <main className="flex-1 overflow-auto p-8">
+              <main className="flex-1 overflow-auto p-4 md:p-8">
                 <Router />
               </main>
             </div>
