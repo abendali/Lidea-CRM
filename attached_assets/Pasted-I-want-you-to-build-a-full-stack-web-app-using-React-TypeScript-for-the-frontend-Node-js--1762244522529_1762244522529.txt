@@ -1,0 +1,123 @@
+I want you to build a full-stack web app using:
+
+- React + TypeScript for the frontend
+- Node.js + Express + Prisma for the backend
+- SQLite as the database
+- TailwindCSS for styling
+
+The app is a **store management system** for my e-commerce brand. 
+It will have two main sections: 
+1. Inventory Management 
+2. Cashflow Tracker
+
+The goal is to manage inventory stock levels, record cashflow transactions, and display key metrics on a dashboard.
+
+---
+
+## 🏗️ GENERAL STRUCTURE
+
+Project should have:
+
+- `/backend` folder with Express + Prisma (API routes, database schema)
+- `/frontend` folder with React + TypeScript + Tailwind
+- SQLite database file in `/backend/prisma/dev.db`
+- Scripts for both backend (`npm run dev`) and frontend (`npm start`)
+- Clear `README.md` with setup steps
+
+---
+
+## 1️⃣ INVENTORY MANAGEMENT
+
+### Data Model:
+Product {
+  id (int, pk)
+  name (string)
+  category (string)
+  estimatedPrice (float)
+  stock (int)
+}
+
+StockMovement {
+  id (int, pk)
+  productId (fk)
+  type ('add' | 'subtract')
+  quantity (int)
+  reason (string)
+  note (string)
+  date (datetime)
+}
+
+### Features:
+- Add new product (name, category, estimated price, initial stock)
+- Show all products in a table:
+  - Name, Category, Unit Price, Stock, Total Value
+  - Buttons: Add Stock, Subtract Stock, Delete Product
+- When clicking Add/Subtract:
+  - Open modal with Quantity + Reason/Note
+  - Record movement in `StockMovement` table
+- Auto-update product stock
+- Summary bar: 
+  - Total products, total stock count, total estimated inventory value
+
+---
+
+## 2️⃣ CASHFLOW TRACKER
+
+### Data Model:
+Cashflow {
+  id (int, pk)
+  type ('income' | 'expense')
+  amount (float)
+  category (string)
+  description (string)
+  date (datetime)
+}
+
+### Features:
+- Show current total balance (Income - Expense)
+- Add new transaction:
+  - Income or Expense button → modal form (amount, category, description, date)
+- Show transactions table with filters (type, date, category)
+- Summary stats:
+  - Total Income
+  - Total Expenses
+  - Net Balance
+  - Initial Capital (editable)
+  - Current Capital = Initial + Net
+
+---
+
+## 3️⃣ DASHBOARD (Home)
+
+### Show overview cards:
+- Total Stock Value
+- Total Cash Balance
+- Number of Products
+- Latest 5 Transactions
+
+---
+
+## 🧩 UI REQUIREMENTS
+
+- Use TailwindCSS for styling (clean, light dashboard theme)
+- Sidebar or top navigation: Home | Inventory | Cashflow
+- Use React Router for page navigation
+- Use modals for adding stock or transactions
+- Use local state or Context for basic global stats
+- Make it mobile responsive
+
+---
+
+## 📦 TECHNICAL NOTES
+
+- Backend routes: `/api/products`, `/api/stock`, `/api/cashflow`
+- Prisma schema with proper relations
+- Return JSON for all endpoints
+- Frontend consumes API with Axios or Fetch
+- Include seed script to create sample data
+- Display flash/success messages (React Toastify or similar)
+
+---
+
+Make everything run fully in Replit — both frontend and backend — and ensure database persistence with SQLite. 
+The result should be a functional MVP dashboard for managing inventory and cashflow for a small manufacturing e-commerce brand.
