@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 interface AddProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { name: string; category: string; estimatedPrice: number; stock: number }) => void;
+  onConfirm: (data: { name: string; category: string; estimatedPrice: number; stock: number; imageUrl?: string }) => void;
 }
 
 export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductModalProps) {
@@ -22,6 +22,7 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
   const [category, setCategory] = useState("");
   const [estimatedPrice, setEstimatedPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   const handleConfirm = () => {
     if (name && category && estimatedPrice && stock) {
@@ -30,11 +31,13 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
         category,
         estimatedPrice: parseFloat(estimatedPrice),
         stock: parseInt(stock),
+        imageUrl: imageUrl || undefined,
       });
       setName("");
       setCategory("");
       setEstimatedPrice("");
       setStock("");
+      setImageUrl("");
       onOpenChange(false);
     }
   };
@@ -92,6 +95,17 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
               value={stock}
               onChange={(e) => setStock(e.target.value)}
               data-testid="input-stock"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+            <Input
+              id="imageUrl"
+              type="url"
+              placeholder="https://example.com/image.jpg"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              data-testid="input-image-url"
             />
           </div>
         </div>

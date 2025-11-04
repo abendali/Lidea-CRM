@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
+import ProductDetail from "@/pages/product-detail";
 import Cashflow from "@/pages/cashflow";
 import Settings from "@/pages/settings";
 import AuthPage from "@/pages/auth-page";
@@ -19,6 +20,7 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/inventory" component={Inventory} />
+      <ProtectedRoute path="/inventory/:id" component={ProductDetail} />
       <ProtectedRoute path="/cashflow" component={Cashflow} />
       <ProtectedRoute path="/settings" component={Settings} />
       <Route path="/auth" component={AuthPage} />

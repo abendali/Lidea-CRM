@@ -3,14 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth } from "./auth";
+import { setupAuth, ensureAuthenticated } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
   // Products API
-  app.get("/api/products", async (req, res) => {
+  app.get("/api/products", ensureAuthenticated, async (req, res) => {
     try {
       const products = await storage.getAllProducts();
       res.json(products);
@@ -19,7 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/products/:id", async (req, res) => {
+  app.get("/api/products/:id", ensureAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const product = await storage.getProduct(id);
@@ -34,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", async (req, res) => {
+  app.post("/api/products", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validatedData);
@@ -47,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/products/:id", async (req, res) => {
+  app.delete("/api/products/:id", ensureAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteProduct(id);
@@ -58,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock Movements API
-  app.get("/api/stock-movements", async (req, res) => {
+  app.get("/api/stock-movements", ensureAuthenticated, async (req, res) => {
     try {
       const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
       
@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-movements", async (req, res) => {
+  app.post("/api/stock-movements", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertStockMovementSchema.parse(req.body);
       
@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cashflow API
-  app.get("/api/cashflows", async (req, res) => {
+  app.get("/api/cashflows", ensureAuthenticated, async (req, res) => {
     try {
       const cashflows = await storage.getAllCashflows();
       res.json(cashflows);
@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cashflows", async (req, res) => {
+  app.post("/api/cashflows", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertCashflowSchema.parse(req.body);
       const cashflow = await storage.createCashflow(validatedData);
@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settings API
-  app.get("/api/settings/:key", async (req, res) => {
+  app.get("/api/settings/:key", ensureAuthenticated, async (req, res) => {
     try {
       const setting = await storage.getSetting(req.params.key);
       
@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/settings", ensureAuthenticated, async (req, res) => {
     try {
       const { key, value } = req.body;
       
@@ -167,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard stats endpoint
-  app.get("/api/dashboard/stats", async (req, res) => {
+  app.get("/api/dashboard/stats", ensureAuthenticated, async (req, res) => {
     try {
       const products = await storage.getAllProducts();
       const cashflows = await storage.getAllCashflows();

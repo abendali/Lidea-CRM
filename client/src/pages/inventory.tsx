@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import type { Product } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Inventory() {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [stockMovementOpen, setStockMovementOpen] = useState(false);
@@ -235,7 +237,12 @@ export default function Inventory() {
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => (
-                    <tr key={product.id} className="border-b last:border-0" data-testid={`row-product-${product.id}`}>
+                    <tr 
+                      key={product.id} 
+                      className="border-b last:border-0 hover-elevate cursor-pointer" 
+                      onClick={() => setLocation(`/inventory/${product.id}`)}
+                      data-testid={`row-product-${product.id}`}
+                    >
                       <td className="p-4 text-sm font-medium">{product.name}</td>
                       <td className="p-4 text-sm">{product.category}</td>
                       <td className="p-4 text-sm text-right tabular-nums">{formatCurrency(product.estimatedPrice)}</td>
@@ -252,7 +259,7 @@ export default function Inventory() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => openStockModal(product, 'add')}
+                            onClick={(e) => { e.stopPropagation(); openStockModal(product, 'add'); }}
                             data-testid={`button-add-stock-${product.id}`}
                           >
                             <Plus className="h-4 w-4" />
@@ -260,7 +267,7 @@ export default function Inventory() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => openStockModal(product, 'subtract')}
+                            onClick={(e) => { e.stopPropagation(); openStockModal(product, 'subtract'); }}
                             data-testid={`button-subtract-stock-${product.id}`}
                           >
                             <Minus className="h-4 w-4" />
@@ -268,7 +275,7 @@ export default function Inventory() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => openDeleteDialog(product)}
+                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
                             data-testid={`button-delete-${product.id}`}
                           >
                             <Trash2 className="h-4 w-4" />

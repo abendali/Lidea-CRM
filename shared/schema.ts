@@ -9,6 +9,7 @@ export const products = pgTable("products", {
   category: text("category").notNull(),
   estimatedPrice: doublePrecision("estimated_price").notNull(),
   stock: integer("stock").notNull().default(0),
+  imageUrl: text("image_url"),
 });
 
 export const stockMovements = pgTable("stock_movements", {
@@ -45,6 +46,7 @@ export const users = pgTable("users", {
 export const insertProductSchema = createInsertSchema(products, {
   estimatedPrice: z.number().min(0),
   stock: z.number().int().min(0),
+  imageUrl: z.string().url().optional().or(z.literal('')),
 }).omit({
   id: true,
 });
