@@ -15,24 +15,94 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// TODO: remove mock data
-const mockProducts = [
-  { id: 1, name: 'Widget A', category: 'Electronics', estimatedPrice: 45.99, stock: 120 },
-  { id: 2, name: 'Widget B', category: 'Electronics', estimatedPrice: 32.50, stock: 85 },
-  { id: 3, name: 'Gadget X', category: 'Accessories', estimatedPrice: 18.75, stock: 200 },
-  { id: 4, name: 'Tool Pro', category: 'Tools', estimatedPrice: 89.99, stock: 45 },
-  { id: 5, name: 'Component Z', category: 'Parts', estimatedPrice: 12.30, stock: 5 },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Product } from "@shared/schema";
 
 export default function Inventory() {
-  const [products, setProducts] = useState(mockProducts);
   const [searchTerm, setSearchTerm] = useState("");
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [stockMovementOpen, setStockMovementOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<'add' | 'subtract'>('add');
+  const { toast } = useToast();
+
+  const { data: products = [], isLoading } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const addProductMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('/api/products', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Product added",
+        description: "The product has been added successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add product.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const stockMovementMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('/api/stock-movements', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Stock updated",
+        description: "Stock has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update stock.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Product deleted",
+        description: "The product has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete product.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,47 +114,49 @@ export default function Inventory() {
   const totalValue = products.reduce((sum, p) => sum + (p.estimatedPrice * p.stock), 0);
 
   const handleAddProduct = (data: any) => {
-    const newProduct = {
-      id: Math.max(...products.map(p => p.id)) + 1,
-      ...data,
-    };
-    setProducts([...products, newProduct]);
-    console.log('Product added:', newProduct);
+    addProductMutation.mutate(data);
+    setAddProductOpen(false);
   };
 
   const handleStockMovement = (data: any) => {
     if (selectedProduct) {
-      setProducts(products.map(p => {
-        if (p.id === selectedProduct.id) {
-          const newStock = movementType === 'add'
-            ? p.stock + data.quantity
-            : p.stock - data.quantity;
-          return { ...p, stock: Math.max(0, newStock) };
-        }
-        return p;
-      }));
-      console.log('Stock movement:', { product: selectedProduct, type: movementType, ...data });
+      stockMovementMutation.mutate({
+        productId: selectedProduct.id,
+        type: movementType,
+        ...data,
+      });
     }
   };
 
   const handleDeleteProduct = () => {
     if (selectedProduct) {
-      setProducts(products.filter(p => p.id !== selectedProduct.id));
-      console.log('Product deleted:', selectedProduct);
+      deleteProductMutation.mutate(selectedProduct.id);
       setDeleteDialogOpen(false);
     }
   };
 
-  const openStockModal = (product: any, type: 'add' | 'subtract') => {
+  const openStockModal = (product: Product, type: 'add' | 'subtract') => {
     setSelectedProduct(product);
     setMovementType(type);
     setStockMovementOpen(true);
   };
 
-  const openDeleteDialog = (product: any) => {
+  const openDeleteDialog = (product: Product) => {
     setSelectedProduct(product);
     setDeleteDialogOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Inventory Management</h1>
+          <p className="text-sm text-muted-foreground">Manage your product inventory and stock levels</p>
+        </div>
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -143,65 +215,71 @@ export default function Inventory() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Unit Price</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Stock</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Total Value</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="border-b last:border-0" data-testid={`row-product-${product.id}`}>
-                    <td className="p-4 text-sm font-medium">{product.name}</td>
-                    <td className="p-4 text-sm">{product.category}</td>
-                    <td className="p-4 text-sm text-right tabular-nums">${product.estimatedPrice.toFixed(2)}</td>
-                    <td className="p-4 text-sm text-right tabular-nums">
-                      <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
-                        {product.stock}
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm text-right tabular-nums font-semibold">
-                      ${(product.estimatedPrice * product.stock).toFixed(2)}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openStockModal(product, 'add')}
-                          data-testid={`button-add-stock-${product.id}`}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openStockModal(product, 'subtract')}
-                          data-testid={`button-subtract-stock-${product.id}`}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openDeleteDialog(product)}
-                          data-testid={`button-delete-${product.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+          {filteredProducts.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {searchTerm ? 'No products found matching your search.' : 'No products yet. Add your first product to get started.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Unit Price</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Stock</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Total Value</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => (
+                    <tr key={product.id} className="border-b last:border-0" data-testid={`row-product-${product.id}`}>
+                      <td className="p-4 text-sm font-medium">{product.name}</td>
+                      <td className="p-4 text-sm">{product.category}</td>
+                      <td className="p-4 text-sm text-right tabular-nums">${product.estimatedPrice.toFixed(2)}</td>
+                      <td className="p-4 text-sm text-right tabular-nums">
+                        <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
+                          {product.stock}
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-right tabular-nums font-semibold">
+                        ${(product.estimatedPrice * product.stock).toFixed(2)}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openStockModal(product, 'add')}
+                            data-testid={`button-add-stock-${product.id}`}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openStockModal(product, 'subtract')}
+                            data-testid={`button-subtract-stock-${product.id}`}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openDeleteDialog(product)}
+                            data-testid={`button-delete-${product.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

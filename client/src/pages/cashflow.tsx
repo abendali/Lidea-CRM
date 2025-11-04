@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,29 +12,98 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Cashflow, Setting } from "@shared/schema";
 
-// TODO: remove mock data
-const mockTransactions = [
-  { id: 1, type: 'income', amount: 450, category: 'Sales', description: 'Product Sale - Widget A', date: '2025-11-03' },
-  { id: 2, type: 'expense', amount: 850, category: 'Materials', description: 'Raw Materials Purchase', date: '2025-11-03' },
-  { id: 3, type: 'income', amount: 320, category: 'Sales', description: 'Product Sale - Widget B', date: '2025-11-02' },
-  { id: 4, type: 'expense', amount: 125, category: 'Utilities', description: 'Electricity and Water Bills', date: '2025-11-02' },
-  { id: 5, type: 'income', amount: 1200, category: 'Sales', description: 'Bulk Order - 50 units', date: '2025-11-01' },
-  { id: 6, type: 'expense', amount: 450, category: 'Labor', description: 'Worker Wages - Week 44', date: '2025-11-01' },
-  { id: 7, type: 'expense', amount: 200, category: 'Marketing', description: 'Facebook Ads Campaign', date: '2025-10-31' },
-  { id: 8, type: 'income', amount: 675, category: 'Services', description: 'Custom Assembly Service', date: '2025-10-30' },
-];
-
-export default function Cashflow() {
-  const [transactions, setTransactions] = useState(mockTransactions);
-  const [initialCapital, setInitialCapital] = useState(5000);
+export default function CashflowPage() {
+  const [initialCapital, setInitialCapital] = useState(0);
   const [isEditingCapital, setIsEditingCapital] = useState(false);
-  const [capitalInput, setCapitalInput] = useState(initialCapital.toString());
+  const [capitalInput, setCapitalInput] = useState("0");
   const [addTransactionOpen, setAddTransactionOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income');
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
+  const { toast } = useToast();
+
+  const { data: transactions = [], isLoading } = useQuery<Cashflow[]>({
+    queryKey: ['/api/cashflows'],
+  });
+
+  const { data: capitalSetting } = useQuery<Setting>({
+    queryKey: ['/api/settings', 'initial_capital'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/settings/initial_capital');
+        if (!response.ok) {
+          // Setting doesn't exist, use default
+          return { id: 0, key: 'initial_capital', value: '0' };
+        }
+        return response.json();
+      } catch {
+        return { id: 0, key: 'initial_capital', value: '0' };
+      }
+    },
+  });
+
+  // Update local state when capital setting is loaded
+  useEffect(() => {
+    if (capitalSetting) {
+      const value = parseFloat(capitalSetting.value);
+      setInitialCapital(value);
+      setCapitalInput(value.toString());
+    }
+  }, [capitalSetting]);
+
+  const addTransactionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('/api/cashflows', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cashflows'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Transaction added",
+        description: "The transaction has been added successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateCapitalMutation = useMutation({
+    mutationFn: async (value: string) => {
+      return apiRequest('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'initial_capital', value }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings', 'initial_capital'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Capital updated",
+        description: "Initial capital has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update capital.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -52,13 +121,11 @@ export default function Cashflow() {
   });
 
   const handleAddTransaction = (data: any) => {
-    const newTransaction = {
-      id: Math.max(...transactions.map(t => t.id)) + 1,
+    addTransactionMutation.mutate({
       type: transactionType,
       ...data,
-    };
-    setTransactions([newTransaction, ...transactions]);
-    console.log('Transaction added:', newTransaction);
+    });
+    setAddTransactionOpen(false);
   };
 
   const openAddTransaction = (type: 'income' | 'expense') => {
@@ -70,10 +137,22 @@ export default function Cashflow() {
     const value = parseFloat(capitalInput);
     if (!isNaN(value) && value >= 0) {
       setInitialCapital(value);
+      updateCapitalMutation.mutate(value.toString());
       setIsEditingCapital(false);
-      console.log('Initial capital updated:', value);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Cashflow Tracker</h1>
+          <p className="text-sm text-muted-foreground">Monitor your income and expenses</p>
+        </div>
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -211,38 +290,46 @@ export default function Cashflow() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="border-b last:border-0" data-testid={`row-transaction-${transaction.id}`}>
-                    <td className="p-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
-                    <td className="p-4">
-                      <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'}>
-                        {transaction.type}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-sm">{transaction.category}</td>
-                    <td className="p-4 text-sm">{transaction.description}</td>
-                    <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
-                      transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
-                    }`}>
-                      {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
-                    </td>
+          {filteredTransactions.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {searchTerm || filterType !== 'all' || filterCategory !== 'all' 
+                ? 'No transactions found matching your filters.' 
+                : 'No transactions yet. Add your first transaction to get started.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-b last:border-0" data-testid={`row-transaction-${transaction.id}`}>
+                      <td className="p-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
+                      <td className="p-4">
+                        <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'}>
+                          {transaction.type}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-sm">{transaction.category}</td>
+                      <td className="p-4 text-sm">{transaction.description}</td>
+                      <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
+                        transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
+                      }`}>
+                        {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

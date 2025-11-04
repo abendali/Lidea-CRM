@@ -36,16 +36,24 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
 });
 
-export const insertProductSchema = createInsertSchema(products).omit({
+export const insertProductSchema = createInsertSchema(products, {
+  estimatedPrice: z.number().min(0),
+  stock: z.number().int().min(0),
+}).omit({
   id: true,
 });
 
-export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
+export const insertStockMovementSchema = createInsertSchema(stockMovements, {
+  quantity: z.number().int().min(1),
+}).omit({
   id: true,
   date: true,
 });
 
-export const insertCashflowSchema = createInsertSchema(cashflows).omit({
+export const insertCashflowSchema = createInsertSchema(cashflows, {
+  amount: z.number().min(0),
+  date: z.string().or(z.date()).transform((val) => new Date(val)),
+}).omit({
   id: true,
 });
 
