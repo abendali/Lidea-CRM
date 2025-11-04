@@ -47,7 +47,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <img src={logoUrl} alt="LiDEA" className="w-32 h-auto" data-testid="img-logo" />
+        <img src={logoUrl} alt="LiDEA" className="w-24 h-auto" data-testid="img-logo" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

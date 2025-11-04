@@ -38,10 +38,8 @@ export default function Inventory() {
 
   const addProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('/api/products', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/products', data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -62,10 +60,8 @@ export default function Inventory() {
 
   const stockMovementMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('/api/stock-movements', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/stock-movements', data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -86,9 +82,7 @@ export default function Inventory() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/products/${id}`, {
-        method: 'DELETE',
-      });
+      await apiRequest('DELETE', `/api/products/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });

@@ -6,13 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Store } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
+import warehouseUrl from "@assets/image_1762252583003.png";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [loginData, setLoginData] = useState({ username: "", password: "" });
   const [registerData, setRegisterData] = useState({ username: "", password: "" });
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const { toast } = useToast();
 
   if (user) {
     return <Redirect to="/" />;
@@ -26,6 +32,16 @@ export default function AuthPage() {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     registerMutation.mutate(registerData);
+  };
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Password Reset Link Sent",
+      description: `If an account exists with ${resetEmail}, you will receive a password reset link.`,
+    });
+    setResetEmail("");
+    setForgotPasswordOpen(false);
   };
 
   return (
@@ -59,7 +75,17 @@ export default function AuthPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="login-password">Password</Label>
+                        <button
+                          type="button"
+                          onClick={() => setForgotPasswordOpen(true)}
+                          className="text-xs text-primary hover:underline"
+                          data-testid="link-forgot-password"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
                       <Input
                         id="login-password"
                         type="password"
@@ -135,14 +161,18 @@ export default function AuthPage() {
         </div>
       </div>
       
-      <div className="hidden lg:flex lg:flex-1 bg-primary items-center justify-center p-12">
-        <div className="text-center space-y-6 max-w-md">
-          <img src={logoUrl} alt="LiDEA" className="w-48 mx-auto" />
-          <h1 className="text-4xl font-bold text-primary-foreground">Store Management System</h1>
-          <p className="text-lg text-primary-foreground/90">
+      <div 
+        className="hidden lg:flex lg:flex-1 items-center justify-center p-12 relative bg-cover bg-center"
+        style={{ backgroundImage: `url(${warehouseUrl})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 to-black/50" />
+        <div className="relative z-10 text-center space-y-6 max-w-md">
+          <img src={logoUrl} alt="LiDEA" className="w-36 mx-auto" />
+          <h1 className="text-4xl font-bold text-white">Store Management System</h1>
+          <p className="text-lg text-white/90">
             Manage your inventory, track cashflow, and grow your business with ease.
           </p>
-          <div className="flex items-center justify-center gap-4 text-primary-foreground/80 pt-4">
+          <div className="flex items-center justify-center gap-4 text-white/80 pt-4">
             <div className="text-center">
               <Store className="h-8 w-8 mx-auto mb-2" />
               <p className="text-sm">Inventory</p>
@@ -158,6 +188,46 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+        <DialogContent data-testid="dialog-forgot-password">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a link to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email Address</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  data-testid="input-reset-email"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setForgotPasswordOpen(false)}
+                data-testid="button-cancel-reset"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" data-testid="button-send-reset-link">
+                Send Reset Link
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

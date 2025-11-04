@@ -60,10 +60,8 @@ export default function CashflowPage() {
 
   const addTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('/api/cashflows', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/cashflows', data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/cashflows'] });
@@ -84,10 +82,8 @@ export default function CashflowPage() {
 
   const updateCapitalMutation = useMutation({
     mutationFn: async (value: string) => {
-      return apiRequest('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify({ key: 'initial_capital', value }),
-      });
+      const res = await apiRequest('POST', '/api/settings', { key: 'initial_capital', value });
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings', 'initial_capital'] });
