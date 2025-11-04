@@ -1,8 +1,4 @@
 import { 
-  products, 
-  stockMovements, 
-  cashflows, 
-  settings,
   type Product, 
   type InsertProduct,
   type StockMovement,
@@ -11,8 +7,6 @@ import {
   type InsertCashflow,
   type Setting
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Products
@@ -37,89 +31,122 @@ export interface IStorage {
   setSetting(key: string, value: string): Promise<Setting>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemStorage implements IStorage {
+  private products: Map<number, Product> = new Map();
+  private stockMovements: Map<number, StockMovement> = new Map();
+  private cashflows: Map<number, Cashflow> = new Map();
+  private settings: Map<string, Setting> = new Map();
+  
+  private productIdCounter = 1;
+  private stockMovementIdCounter = 1;
+  private cashflowIdCounter = 1;
+  private settingIdCounter = 1;
+
   // Products
   async getAllProducts(): Promise<Product[]> {
-    return await db.select().from(products);
+    return Array.from(this.products.values());
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product || undefined;
+    return this.products.get(id);
   }
 
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const [product] = await db.insert(products).values(insertProduct as any).returning();
+    const product: Product = {
+      id: this.productIdCounter++,
+      ...insertProduct,
+      stock: insertProduct.stock ?? 0,
+    };
+    this.products.set(product.id, product);
     return product;
   }
 
   async deleteProduct(id: number): Promise<void> {
-    await db.delete(products).where(eq(products.id, id));
+    this.products.delete(id);
+    // Delete associated stock movements
+    for (const [movementId, movement] of this.stockMovements.entries()) {
+      if (movement.productId === id) {
+        this.stockMovements.delete(movementId);
+      }
+    }
   }
 
   async updateProductStock(id: number, newStock: number): Promise<Product> {
-    const [product] = await db
-      .update(products)
-      .set({ stock: newStock })
-      .where(eq(products.id, id))
-      .returning();
-    return product;
+    const product = this.products.get(id);
+    if (!product) {
+      throw new Error('Product not found');
+    }
+    const updated = { ...product, stock: newStock };
+    this.products.set(id, updated);
+    return updated;
   }
 
   // Stock Movements
   async getAllStockMovements(): Promise<StockMovement[]> {
-    return await db.select().from(stockMovements).orderBy(desc(stockMovements.date));
+    return Array.from(this.stockMovements.values()).sort((a, b) => 
+      b.date.getTime() - a.date.getTime()
+    );
   }
 
   async getStockMovementsByProduct(productId: number): Promise<StockMovement[]> {
-    return await db
-      .select()
-      .from(stockMovements)
-      .where(eq(stockMovements.productId, productId))
-      .orderBy(desc(stockMovements.date));
+    return Array.from(this.stockMovements.values())
+      .filter(m => m.productId === productId)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   async createStockMovement(movement: InsertStockMovement): Promise<StockMovement> {
-    const [stockMovement] = await db.insert(stockMovements).values(movement as any).returning();
+    const stockMovement: StockMovement = {
+      id: this.stockMovementIdCounter++,
+      ...movement,
+      note: movement.note ?? '',
+      date: new Date(),
+    };
+    this.stockMovements.set(stockMovement.id, stockMovement);
     return stockMovement;
   }
 
   // Cashflows
   async getAllCashflows(): Promise<Cashflow[]> {
-    return await db.select().from(cashflows).orderBy(desc(cashflows.date));
+    return Array.from(this.cashflows.values()).sort((a, b) => 
+      b.date.getTime() - a.date.getTime()
+    );
   }
 
   async getCashflow(id: number): Promise<Cashflow | undefined> {
-    const [cashflow] = await db.select().from(cashflows).where(eq(cashflows.id, id));
-    return cashflow || undefined;
+    return this.cashflows.get(id);
   }
 
   async createCashflow(insertCashflow: InsertCashflow): Promise<Cashflow> {
-    const [cashflow] = await db.insert(cashflows).values(insertCashflow as any).returning();
+    const cashflow: Cashflow = {
+      id: this.cashflowIdCounter++,
+      ...insertCashflow,
+    };
+    this.cashflows.set(cashflow.id, cashflow);
     return cashflow;
   }
 
   // Settings
   async getSetting(key: string): Promise<Setting | undefined> {
-    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
-    return setting || undefined;
+    return this.settings.get(key);
   }
 
   async setSetting(key: string, value: string): Promise<Setting> {
-    const existing = await this.getSetting(key);
+    const existing = this.settings.get(key);
     
     if (existing) {
-      const [setting] = await db
-        .update(settings)
-        .set({ value })
-        .where(eq(settings.key, key))
-        .returning();
-      return setting;
+      const updated = { ...existing, value };
+      this.settings.set(key, updated);
+      return updated;
     } else {
-      const [setting] = await db.insert(settings).values({ key, value }).returning();
+      const setting: Setting = {
+        id: this.settingIdCounter++,
+        key,
+        value,
+      };
+      this.settings.set(key, setting);
       return setting;
     }
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
