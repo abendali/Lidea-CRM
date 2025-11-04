@@ -70,7 +70,7 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="price">Estimated Price ($)</Label>
+            <Label htmlFor="price">Estimated Price (د.ج)</Label>
             <Input
               id="price"
               type="number"

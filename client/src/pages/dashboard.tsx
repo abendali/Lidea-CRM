@@ -4,6 +4,7 @@ import { Package, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { Cashflow } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 interface DashboardStats {
   totalProducts: number;
@@ -53,13 +54,13 @@ export default function Dashboard() {
         />
         <MetricCard
           title="Stock Value"
-          value={`$${(stats?.totalStockValue || 0).toLocaleString()}`}
+          value={formatCurrency(stats?.totalStockValue || 0)}
           icon={TrendingUp}
           testId="card-stock-value"
         />
         <MetricCard
           title="Cash Balance"
-          value={`$${(stats?.currentCapital || 0).toLocaleString()}`}
+          value={formatCurrency(stats?.currentCapital || 0)}
           icon={DollarSign}
           testId="card-cash-balance"
         />
@@ -108,7 +109,7 @@ export default function Dashboard() {
                         transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
                       }`}
                     >
-                      {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                      {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                     </div>
                   </div>
                 ))}
@@ -136,13 +137,13 @@ export default function Dashboard() {
               <div className="flex items-center justify-between py-3 border-b">
                 <span className="text-sm text-muted-foreground">Total Stock Value</span>
                 <span className="text-sm font-semibold tabular-nums">
-                  ${(stats?.totalStockValue || 0).toLocaleString()}
+                  {formatCurrency(stats?.totalStockValue || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between py-3">
                 <span className="text-sm text-muted-foreground">Available Cash</span>
                 <span className="text-sm font-semibold tabular-nums text-chart-2">
-                  ${(stats?.currentCapital || 0).toLocaleString()}
+                  {formatCurrency(stats?.currentCapital || 0)}
                 </span>
               </div>
             </div>

@@ -19,6 +19,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -195,7 +196,7 @@ export default function Inventory() {
             <CardTitle className="text-sm font-medium">Total Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tabular-nums" data-testid="text-total-value">${totalValue.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums" data-testid="text-total-value">{formatCurrency(totalValue)}</div>
           </CardContent>
         </Card>
       </div>
@@ -237,14 +238,14 @@ export default function Inventory() {
                     <tr key={product.id} className="border-b last:border-0" data-testid={`row-product-${product.id}`}>
                       <td className="p-4 text-sm font-medium">{product.name}</td>
                       <td className="p-4 text-sm">{product.category}</td>
-                      <td className="p-4 text-sm text-right tabular-nums">${product.estimatedPrice.toFixed(2)}</td>
+                      <td className="p-4 text-sm text-right tabular-nums">{formatCurrency(product.estimatedPrice)}</td>
                       <td className="p-4 text-sm text-right tabular-nums">
                         <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
                           {product.stock}
                         </span>
                       </td>
                       <td className="p-4 text-sm text-right tabular-nums font-semibold">
-                        ${(product.estimatedPrice * product.stock).toFixed(2)}
+                        {formatCurrency(product.estimatedPrice * product.stock)}
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-2">

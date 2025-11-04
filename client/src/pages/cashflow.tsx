@@ -16,6 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Cashflow, Setting } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 export default function CashflowPage() {
   const [initialCapital, setInitialCapital] = useState(0);
@@ -211,7 +212,7 @@ export default function CashflowPage() {
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-bold tabular-nums" data-testid="text-initial-capital">
-                    ${initialCapital.toFixed(2)}
+                    {formatCurrency(initialCapital)}
                   </span>
                   <Button
                     size="sm"
@@ -227,7 +228,7 @@ export default function CashflowPage() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Current Capital</p>
               <p className={`text-2xl font-bold tabular-nums ${currentCapital >= initialCapital ? 'text-chart-2' : 'text-destructive'}`} data-testid="text-current-capital">
-                ${currentCapital.toFixed(2)}
+                {formatCurrency(currentCapital)}
               </p>
             </div>
           </div>
@@ -235,19 +236,19 @@ export default function CashflowPage() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Income</p>
               <p className="text-xl font-bold tabular-nums text-chart-2" data-testid="text-total-income">
-                +${totalIncome.toFixed(2)}
+                +{formatCurrency(totalIncome)}
               </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Expenses</p>
               <p className="text-xl font-bold tabular-nums text-destructive" data-testid="text-total-expenses">
-                -${totalExpense.toFixed(2)}
+                -{formatCurrency(totalExpense)}
               </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Net Balance</p>
               <p className={`text-xl font-bold tabular-nums ${netBalance >= 0 ? 'text-chart-2' : 'text-destructive'}`} data-testid="text-net-balance">
-                {netBalance >= 0 ? '+' : ''}${netBalance.toFixed(2)}
+                {netBalance >= 0 ? '+' : ''}{formatCurrency(Math.abs(netBalance))}
               </p>
             </div>
           </div>
@@ -322,7 +323,7 @@ export default function CashflowPage() {
                       <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
                         transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
                       }`}>
-                        {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </td>
                     </tr>
                   ))}
