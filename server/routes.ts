@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema } from "@shared/schema";
+import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, ensureAuthenticated } from "./auth";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -132,8 +133,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/cashflows", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertCashflowSchema.parse(req.body);
-      const cashflow = await storage.createCashflow(validatedData);
+      const cashflow = await storage.createCashflow({
+        ...validatedData,
+        createdBy: req.user!.id,
+      });
       res.status(201).json(cashflow);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // User API
+  app.patch("/api/users/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (id !== req.user!.id) {
+        return res.status(403).json({ message: "You can only update your own profile" });
+      }
+      
+      const validatedData = updateUserSchema.parse(req.body);
+      
+      // Hash password if provided
+      const updates = { ...validatedData };
+      if (updates.password) {
+        updates.password = await bcrypt.hash(updates.password, 10);
+      }
+      
+      const user = await storage.updateUser(id, updates);
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
@@ -185,7 +219,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertWorkshopOrderSchema.parse(req.body);
-      const order = await storage.createWorkshopOrder(validatedData);
+      const order = await storage.createWorkshopOrder({
+        ...validatedData,
+        createdBy: req.user!.id,
+      });
       res.status(201).json(order);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
