@@ -23,7 +23,7 @@ export function ensureAuthenticated(req: Request, res: Response, next: NextFunct
   res.status(401).send("Unauthorized");
 }
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
@@ -94,7 +94,8 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
       });
     } catch (error: any) {
       res.status(400).send(error.message || "Invalid registration data");
@@ -102,7 +103,8 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    const { password, ...userWithoutPassword } = req.user!;
+    res.status(200).json(userWithoutPassword);
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -114,6 +116,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    const { password, ...userWithoutPassword } = req.user!;
+    res.json(userWithoutPassword);
   });
 }

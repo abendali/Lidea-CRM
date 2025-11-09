@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUsers } from "@/hooks/use-users";
 import { useState } from "react";
 import {
   Dialog,
@@ -27,6 +28,7 @@ export default function ProductDetail() {
   const [, params] = useRoute("/inventory/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { getUserName } = useUsers();
   const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
   const [stockFormData, setStockFormData] = useState({
@@ -232,6 +234,9 @@ export default function ProductDetail() {
                       {movement.note && (
                         <p className="text-xs text-muted-foreground mt-1">{movement.note}</p>
                       )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        By: {getUserName(movement.createdBy)}
+                      </p>
                     </div>
                   </div>
                 ))}

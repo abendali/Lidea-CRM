@@ -15,6 +15,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUsers } from "@/hooks/use-users";
 import type { Cashflow, Setting } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export default function CashflowPage() {
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const { toast } = useToast();
+  const { getUserName } = useUsers();
 
   const { data: transactions = [], isLoading } = useQuery<Cashflow[]>({
     queryKey: ['/api/cashflows'],
@@ -302,6 +304,7 @@ export default function CashflowPage() {
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Created By</th>
                     <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amount</th>
                   </tr>
                 </thead>
@@ -316,6 +319,7 @@ export default function CashflowPage() {
                       </td>
                       <td className="p-4 text-sm">{transaction.category}</td>
                       <td className="p-4 text-sm">{transaction.description}</td>
+                      <td className="p-4 text-sm text-muted-foreground">{getUserName(transaction.createdBy)}</td>
                       <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
                         transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
                       }`}>

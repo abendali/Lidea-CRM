@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { WorkshopOrder, InsertWorkshopOrder, Product } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUsers } from "@/hooks/use-users";
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ export default function WorkshopOrders() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<WorkshopOrder | null>(null);
   const { toast } = useToast();
+  const { getUserName } = useUsers();
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<WorkshopOrder[]>({
     queryKey: ["/api/workshop-orders"],
@@ -395,6 +397,7 @@ export default function WorkshopOrders() {
                   <TableHead>Date</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Quantity</TableHead>
+                  <TableHead>Created By</TableHead>
                   <TableHead>Order Value</TableHead>
                   <TableHead>Material</TableHead>
                   <TableHead>Wood</TableHead>
@@ -418,6 +421,7 @@ export default function WorkshopOrders() {
                         {getProductName(order.productId)}
                       </TableCell>
                       <TableCell>{order.quantity}</TableCell>
+                      <TableCell className="text-muted-foreground">{getUserName(order.createdBy)}</TableCell>
                       <TableCell>${order.totalOrderValue.toFixed(2)}</TableCell>
                       <TableCell>${order.materialCost.toFixed(2)}</TableCell>
                       <TableCell>${order.woodCost.toFixed(2)}</TableCell>

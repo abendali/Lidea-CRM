@@ -35,6 +35,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",

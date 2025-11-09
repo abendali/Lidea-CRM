@@ -3,8 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, ensureAuthenticated } from "./auth";
-import bcrypt from "bcryptjs";
+import { setupAuth, ensureAuthenticated, hashPassword } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -147,6 +146,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User API
+  app.get("/api/users", ensureAuthenticated, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/users/:id", ensureAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -160,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password if provided
       const updates = { ...validatedData };
       if (updates.password) {
-        updates.password = await bcrypt.hash(updates.password, 10);
+        updates.password = await hashPassword(updates.password);
       }
       
       const user = await storage.updateUser(id, updates);
