@@ -8,6 +8,7 @@ import {
   type Setting,
   type User,
   type InsertUser,
+  type UpdateUser,
   type WorkshopOrder,
   type InsertWorkshopOrder
 } from "@shared/schema";
@@ -37,7 +38,7 @@ export interface IStorage {
   // Cashflows
   getAllCashflows(): Promise<Cashflow[]>;
   getCashflow(id: number): Promise<Cashflow | undefined>;
-  createCashflow(cashflow: InsertCashflow): Promise<Cashflow>;
+  createCashflow(cashflow: InsertCashflow & { createdBy: number }): Promise<Cashflow>;
 
   // Settings
   getSetting(key: string): Promise<Setting | undefined>;
@@ -48,11 +49,12 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: UpdateUser): Promise<User>;
 
   // Workshop Orders
   getAllWorkshopOrders(): Promise<WorkshopOrder[]>;
   getWorkshopOrder(id: number): Promise<WorkshopOrder | undefined>;
-  createWorkshopOrder(order: InsertWorkshopOrder): Promise<WorkshopOrder>;
+  createWorkshopOrder(order: InsertWorkshopOrder & { createdBy: number }): Promise<WorkshopOrder>;
   updateWorkshopOrder(id: number, order: Partial<InsertWorkshopOrder>): Promise<WorkshopOrder>;
   deleteWorkshopOrder(id: number): Promise<void>;
 
@@ -158,7 +160,7 @@ export class MemStorage implements IStorage {
     return this.cashflows.get(id);
   }
 
-  async createCashflow(insertCashflow: InsertCashflow): Promise<Cashflow> {
+  async createCashflow(insertCashflow: InsertCashflow & { createdBy: number }): Promise<Cashflow> {
     const cashflow: Cashflow = {
       id: this.cashflowIdCounter++,
       ...insertCashflow,
@@ -207,9 +209,23 @@ export class MemStorage implements IStorage {
     const user: User = {
       id: this.userIdCounter++,
       ...insertUser,
+      profilePicture: insertUser.profilePicture || null,
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUser(id: number, updates: UpdateUser): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    const updated: User = {
+      ...user,
+      ...updates,
+    };
+    this.users.set(id, updated);
+    return updated;
   }
 
   // Workshop Orders
@@ -223,7 +239,7 @@ export class MemStorage implements IStorage {
     return this.workshopOrders.get(id);
   }
 
-  async createWorkshopOrder(insertOrder: InsertWorkshopOrder): Promise<WorkshopOrder> {
+  async createWorkshopOrder(insertOrder: InsertWorkshopOrder & { createdBy: number }): Promise<WorkshopOrder> {
     const order: WorkshopOrder = {
       id: this.workshopOrderIdCounter++,
       ...insertOrder,
@@ -313,7 +329,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createCashflow(insertCashflow: InsertCashflow): Promise<Cashflow> {
+  async createCashflow(insertCashflow: InsertCashflow & { createdBy: number }): Promise<Cashflow> {
     const result = await db.insert(cashflows).values(insertCashflow).returning();
     return result[0];
   }
@@ -357,6 +373,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async updateUser(id: number, updates: UpdateUser): Promise<User> {
+    const result = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    if (result.length === 0) {
+      throw new Error("User not found");
+    }
+    return result[0];
+  }
+
   // Workshop Orders
   async getAllWorkshopOrders(): Promise<WorkshopOrder[]> {
     return await db.select().from(workshopOrders).orderBy(desc(workshopOrders.date));
@@ -367,7 +391,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createWorkshopOrder(insertOrder: InsertWorkshopOrder): Promise<WorkshopOrder> {
+  async createWorkshopOrder(insertOrder: InsertWorkshopOrder & { createdBy: number }): Promise<WorkshopOrder> {
     const result = await db.insert(workshopOrders).values(insertOrder).returning();
     return result[0];
   }
