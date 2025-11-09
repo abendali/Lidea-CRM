@@ -32,6 +32,7 @@ export const cashflows = pgTable("cashflows", {
   category: text("category").notNull(),
   description: text("description").notNull(),
   date: timestamp("date").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const settings = pgTable("settings", {
@@ -45,6 +46,8 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  name: text("name").notNull(),
+  profilePicture: text("profile_picture"),
 });
 
 export const workshopOrders = pgTable("workshop_orders", {
@@ -57,6 +60,7 @@ export const workshopOrders = pgTable("workshop_orders", {
   otherCosts: doublePrecision("other_costs").notNull().default(0),
   date: timestamp("date").notNull().defaultNow(),
   notes: text("notes").notNull().default(''),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const insertProductSchema = createInsertSchema(products, {
@@ -82,6 +86,7 @@ export const insertCashflowSchema = createInsertSchema(cashflows, {
   date: z.string().or(z.date()).transform((val) => new Date(val)),
 }).omit({
   id: true,
+  createdBy: true,
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -99,6 +104,8 @@ export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3).max(50),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6),
+  name: z.string().min(1).max(100),
+  profilePicture: z.string().url().optional().or(z.literal('')),
 }).omit({
   id: true,
 });
@@ -112,9 +119,19 @@ export const insertWorkshopOrderSchema = createInsertSchema(workshopOrders, {
 }).omit({
   id: true,
   date: true,
+  createdBy: true,
+});
+
+export const updateUserSchema = z.object({
+  username: z.string().min(3).max(50).optional(),
+  email: z.string().email("Invalid email address").optional(),
+  password: z.string().min(6).optional(),
+  name: z.string().min(1).max(100).optional(),
+  profilePicture: z.string().url().optional().or(z.literal('')),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export type InsertWorkshopOrder = z.infer<typeof insertWorkshopOrderSchema>;
