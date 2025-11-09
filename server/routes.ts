@@ -37,7 +37,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", ensureAuthenticated, async (req, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);
-      const product = await storage.createProduct(validatedData);
+      const product = await storage.createProduct({
+        ...validatedData,
+        createdBy: req.user!.id,
+      });
       res.status(201).json(product);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -101,8 +104,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create movement and update product stock
-      const movement = await storage.createStockMovement(validatedData);
-      await storage.updateProductStock(validatedData.productId as number, newStock);
+      const movement = await storage.createStockMovement({
+        ...validatedData,
+        createdBy: req.user!.id,
+      });
+      await storage.updateProductStock(validatedData.productId as number, newStock, req.user!.id);
 
       res.status(201).json(movement);
     } catch (error: any) {

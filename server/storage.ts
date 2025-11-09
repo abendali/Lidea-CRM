@@ -25,14 +25,14 @@ export interface IStorage {
   // Products
   getAllProducts(): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
+  createProduct(product: InsertProduct & { createdBy: number }): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
-  updateProductStock(id: number, newStock: number): Promise<Product>;
+  updateProductStock(id: number, newStock: number, modifiedBy: number): Promise<Product>;
 
   // Stock Movements
   getAllStockMovements(): Promise<StockMovement[]>;
   getStockMovementsByProduct(productId: number): Promise<StockMovement[]>;
-  createStockMovement(movement: InsertStockMovement): Promise<StockMovement>;
+  createStockMovement(movement: InsertStockMovement & { createdBy: number }): Promise<StockMovement>;
 
   // Cashflows
   getAllCashflows(): Promise<Cashflow[]>;
@@ -91,11 +91,12 @@ export class MemStorage implements IStorage {
     return this.products.get(id);
   }
 
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+  async createProduct(insertProduct: InsertProduct & { createdBy: number }): Promise<Product> {
     const product: Product = {
       id: this.productIdCounter++,
       ...insertProduct,
       stock: insertProduct.stock ?? 0,
+      modifiedBy: null,
     };
     this.products.set(product.id, product);
     return product;
@@ -111,12 +112,12 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateProductStock(id: number, newStock: number): Promise<Product> {
+  async updateProductStock(id: number, newStock: number, modifiedBy: number): Promise<Product> {
     const product = this.products.get(id);
     if (!product) {
       throw new Error('Product not found');
     }
-    const updated = { ...product, stock: newStock };
+    const updated = { ...product, stock: newStock, modifiedBy };
     this.products.set(id, updated);
     return updated;
   }
@@ -134,7 +135,7 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
-  async createStockMovement(movement: InsertStockMovement): Promise<StockMovement> {
+  async createStockMovement(movement: InsertStockMovement & { createdBy: number }): Promise<StockMovement> {
     const stockMovement: StockMovement = {
       id: this.stockMovementIdCounter++,
       ...movement,
@@ -260,7 +261,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+  async createProduct(insertProduct: InsertProduct & { createdBy: number }): Promise<Product> {
     const result = await db.insert(products).values(insertProduct).returning();
     return result[0];
   }
@@ -269,8 +270,8 @@ export class DbStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
-  async updateProductStock(id: number, newStock: number): Promise<Product> {
-    const result = await db.update(products).set({ stock: newStock }).where(eq(products.id, id)).returning();
+  async updateProductStock(id: number, newStock: number, modifiedBy: number): Promise<Product> {
+    const result = await db.update(products).set({ stock: newStock, modifiedBy }).where(eq(products.id, id)).returning();
     return result[0];
   }
 
@@ -283,7 +284,7 @@ export class DbStorage implements IStorage {
     return await db.select().from(stockMovements).where(eq(stockMovements.productId, productId)).orderBy(desc(stockMovements.date));
   }
 
-  async createStockMovement(movement: InsertStockMovement): Promise<StockMovement> {
+  async createStockMovement(movement: InsertStockMovement & { createdBy: number }): Promise<StockMovement> {
     const result = await db.insert(stockMovements).values(movement).returning();
     return result[0];
   }

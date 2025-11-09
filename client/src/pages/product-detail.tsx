@@ -44,7 +44,12 @@ export default function ProductDetail() {
   });
 
   const { data: movements = [], isLoading: movementsLoading } = useQuery<StockMovement[]>({
-    queryKey: ["/api/stock-movements", productId],
+    queryKey: ["/api/stock-movements", { productId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-movements?productId=${productId}`);
+      if (!res.ok) throw new Error('Failed to fetch stock movements');
+      return res.json();
+    },
     enabled: !!productId,
   });
 

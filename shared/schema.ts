@@ -10,6 +10,8 @@ export const products = pgTable("products", {
   estimatedPrice: doublePrecision("estimated_price").notNull(),
   stock: integer("stock").notNull().default(0),
   imageUrl: text("image_url"),
+  createdBy: integer("created_by").references(() => users.id),
+  modifiedBy: integer("modified_by").references(() => users.id),
 });
 
 export const stockMovements = pgTable("stock_movements", {
@@ -20,6 +22,7 @@ export const stockMovements = pgTable("stock_movements", {
   reason: text("reason").notNull(),
   note: text("note").notNull().default(''),
   date: timestamp("date").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const cashflows = pgTable("cashflows", {
@@ -62,6 +65,8 @@ export const insertProductSchema = createInsertSchema(products, {
   imageUrl: z.string().url().optional().or(z.literal('')),
 }).omit({
   id: true,
+  createdBy: true,
+  modifiedBy: true,
 });
 
 export const insertStockMovementSchema = createInsertSchema(stockMovements, {
@@ -69,6 +74,7 @@ export const insertStockMovementSchema = createInsertSchema(stockMovements, {
 }).omit({
   id: true,
   date: true,
+  createdBy: true,
 });
 
 export const insertCashflowSchema = createInsertSchema(cashflows, {
