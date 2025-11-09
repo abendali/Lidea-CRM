@@ -46,7 +46,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  name: text("name").notNull(),
+  name: text("name"),
   profilePicture: text("profile_picture"),
 });
 
@@ -104,7 +104,7 @@ export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3).max(50),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6),
-  name: z.string().min(1).max(100),
+  name: z.string().min(1).max(100).optional(),
   profilePicture: z.string().url().optional().or(z.literal('')),
 }).omit({
   id: true,
