@@ -15,7 +15,7 @@ import warehouseUrl from "@assets/image_1762252583003.png";
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [registerData, setRegisterData] = useState({ username: "", email: "", password: "" });
+  const [registerData, setRegisterData] = useState({ username: "", email: "", password: "", name: "" });
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const { toast } = useToast();
@@ -117,6 +117,18 @@ export default function AuthPage() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleRegister} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="register-name">Full Name</Label>
+                      <Input
+                        id="register-name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={registerData.name}
+                        onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
+                        required
+                        data-testid="input-register-name"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="register-username">Username</Label>
                       <Input
