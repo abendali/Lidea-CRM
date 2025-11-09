@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema } from "@shared/schema";
+import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, ensureAuthenticated } from "./auth";
 
@@ -161,6 +161,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const setting = await storage.setSetting(key, value);
       res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Workshop Orders API
+  app.get("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+    try {
+      const orders = await storage.getAllWorkshopOrders();
+      res.json(orders);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertWorkshopOrderSchema.parse(req.body);
+      const order = await storage.createWorkshopOrder(validatedData);
+      res.status(201).json(order);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteWorkshopOrder(id);
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

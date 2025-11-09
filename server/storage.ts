@@ -7,7 +7,9 @@ import {
   type InsertCashflow,
   type Setting,
   type User,
-  type InsertUser
+  type InsertUser,
+  type WorkshopOrder,
+  type InsertWorkshopOrder
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -41,6 +43,12 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
+  // Workshop Orders
+  getAllWorkshopOrders(): Promise<WorkshopOrder[]>;
+  getWorkshopOrder(id: number): Promise<WorkshopOrder | undefined>;
+  createWorkshopOrder(order: InsertWorkshopOrder): Promise<WorkshopOrder>;
+  deleteWorkshopOrder(id: number): Promise<void>;
+
   // Session store
   sessionStore: session.SessionStore;
 }
@@ -51,12 +59,14 @@ export class MemStorage implements IStorage {
   private cashflows: Map<number, Cashflow> = new Map();
   private settings: Map<string, Setting> = new Map();
   private users: Map<number, User> = new Map();
+  private workshopOrders: Map<number, WorkshopOrder> = new Map();
   
   private productIdCounter = 1;
   private stockMovementIdCounter = 1;
   private cashflowIdCounter = 1;
   private settingIdCounter = 1;
   private userIdCounter = 1;
+  private workshopOrderIdCounter = 1;
 
   sessionStore: session.SessionStore;
 
@@ -188,6 +198,35 @@ export class MemStorage implements IStorage {
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+  // Workshop Orders
+  async getAllWorkshopOrders(): Promise<WorkshopOrder[]> {
+    return Array.from(this.workshopOrders.values()).sort((a, b) => 
+      b.date.getTime() - a.date.getTime()
+    );
+  }
+
+  async getWorkshopOrder(id: number): Promise<WorkshopOrder | undefined> {
+    return this.workshopOrders.get(id);
+  }
+
+  async createWorkshopOrder(insertOrder: InsertWorkshopOrder): Promise<WorkshopOrder> {
+    const order: WorkshopOrder = {
+      id: this.workshopOrderIdCounter++,
+      ...insertOrder,
+      materialCost: insertOrder.materialCost ?? 0,
+      woodCost: insertOrder.woodCost ?? 0,
+      otherCosts: insertOrder.otherCosts ?? 0,
+      notes: insertOrder.notes ?? '',
+      date: new Date(),
+    };
+    this.workshopOrders.set(order.id, order);
+    return order;
+  }
+
+  async deleteWorkshopOrder(id: number): Promise<void> {
+    this.workshopOrders.delete(id);
   }
 }
 

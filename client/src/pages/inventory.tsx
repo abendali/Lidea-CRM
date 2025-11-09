@@ -3,9 +3,8 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Minus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import { AddProductModal } from "@/components/add-product-modal";
-import { StockMovementModal } from "@/components/stock-movement-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,10 +25,8 @@ export default function Inventory() {
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [addProductOpen, setAddProductOpen] = useState(false);
-  const [stockMovementOpen, setStockMovementOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [movementType, setMovementType] = useState<'add' | 'subtract'>('add');
   const { toast } = useToast();
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
@@ -53,28 +50,6 @@ export default function Inventory() {
       toast({
         title: "Error",
         description: "Failed to add product.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const stockMovementMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest('POST', '/api/stock-movements', data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      toast({
-        title: "Stock updated",
-        description: "Stock has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update stock.",
         variant: "destructive",
       });
     },
@@ -115,27 +90,11 @@ export default function Inventory() {
     setAddProductOpen(false);
   };
 
-  const handleStockMovement = (data: any) => {
-    if (selectedProduct) {
-      stockMovementMutation.mutate({
-        productId: selectedProduct.id,
-        type: movementType,
-        ...data,
-      });
-    }
-  };
-
   const handleDeleteProduct = () => {
     if (selectedProduct) {
       deleteProductMutation.mutate(selectedProduct.id);
       setDeleteDialogOpen(false);
     }
-  };
-
-  const openStockModal = (product: Product, type: 'add' | 'subtract') => {
-    setSelectedProduct(product);
-    setMovementType(type);
-    setStockMovementOpen(true);
   };
 
   const openDeleteDialog = (product: Product) => {
@@ -253,22 +212,6 @@ export default function Inventory() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); openStockModal(product, 'add'); }}
-                            data-testid={`button-add-stock-${product.id}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); openStockModal(product, 'subtract'); }}
-                            data-testid={`button-subtract-stock-${product.id}`}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
                             onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
                             data-testid={`button-delete-${product.id}`}
                           >
@@ -290,16 +233,6 @@ export default function Inventory() {
         onOpenChange={setAddProductOpen}
         onConfirm={handleAddProduct}
       />
-
-      {selectedProduct && (
-        <StockMovementModal
-          open={stockMovementOpen}
-          onOpenChange={setStockMovementOpen}
-          productName={selectedProduct.name}
-          type={movementType}
-          onConfirm={handleStockMovement}
-        />
-      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-product">

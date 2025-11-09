@@ -28,6 +28,7 @@ export default function ProductDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
+  const [confirmationText, setConfirmationText] = useState('');
   const [stockFormData, setStockFormData] = useState({
     type: 'add' as 'add' | 'subtract',
     quantity: 1,
@@ -61,6 +62,7 @@ export default function ProductDetail() {
       });
       setIsStockDialogOpen(false);
       setStockFormData({ type: 'add', quantity: 1, reason: '', note: '' });
+      setConfirmationText('');
     },
     onError: (error: Error) => {
       toast({
@@ -72,7 +74,35 @@ export default function ProductDetail() {
   });
 
   const handleStockMovement = () => {
-    if (!productId) return;
+    if (!productId || !product) return;
+    
+    if (confirmationText.toLowerCase() !== 'i confirm') {
+      toast({
+        title: "Confirmation required",
+        description: "Please type 'i confirm' to proceed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (stockFormData.quantity < 1) {
+      toast({
+        title: "Invalid quantity",
+        description: "Quantity must be at least 1.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (stockFormData.type === 'subtract' && stockFormData.quantity > product.stock) {
+      toast({
+        title: "Insufficient stock",
+        description: `Cannot remove ${stockFormData.quantity} items. Only ${product.stock} available.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     stockMovementMutation.mutate({
       productId,
       ...stockFormData,
@@ -239,7 +269,10 @@ export default function ProductDetail() {
                 type="number"
                 min="1"
                 value={stockFormData.quantity}
-                onChange={(e) => setStockFormData({ ...stockFormData, quantity: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setStockFormData({ ...stockFormData, quantity: val > 0 ? val : 1 });
+                }}
                 data-testid="input-quantity"
               />
             </div>
@@ -263,18 +296,40 @@ export default function ProductDetail() {
                 data-testid="input-note"
               />
             </div>
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="confirmation" className="text-destructive">
+                Confirmation Required
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                This action cannot be reversed. Type "i confirm" to proceed.
+              </p>
+              <Input
+                id="confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder="Type: i confirm"
+                data-testid="input-confirmation"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button 
               variant="outline" 
-              onClick={() => setIsStockDialogOpen(false)}
+              onClick={() => {
+                setIsStockDialogOpen(false);
+                setConfirmationText('');
+              }}
               data-testid="button-cancel"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleStockMovement}
-              disabled={!stockFormData.reason || stockMovementMutation.isPending}
+              disabled={
+                !stockFormData.reason || 
+                confirmationText !== 'i confirm' || 
+                stockMovementMutation.isPending
+              }
               data-testid="button-submit-movement"
             >
               {stockMovementMutation.isPending ? "Updating..." : "Update Stock"}

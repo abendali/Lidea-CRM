@@ -1,19 +1,49 @@
 import { MetricCard } from "@/components/metric-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Package, DollarSign, TrendingUp, AlertCircle, Wrench, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import type { Cashflow } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import type { Cashflow, WorkshopOrder, Product, InsertWorkshopOrder } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface DashboardStats {
   totalProducts: number;
   totalStockValue: number;
   cashBalance: number;
   lowStockCount: number;
+  currentCapital: number;
 }
 
 export default function Dashboard() {
+  const { toast } = useToast();
+  const [isWorkshopDialogOpen, setIsWorkshopDialogOpen] = useState(false);
+  const [workshopFormData, setWorkshopFormData] = useState({
+    productId: '',
+    quantity: 1,
+    totalOrderValue: 0,
+    materialCost: 0,
+    woodCost: 0,
+    otherCosts: 0,
+    notes: ''
+  });
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
   });
@@ -21,6 +51,126 @@ export default function Dashboard() {
   const { data: transactions, isLoading: transactionsLoading } = useQuery<Cashflow[]>({
     queryKey: ['/api/cashflows'],
   });
+
+  const { data: workshopOrders = [], isLoading: workshopOrdersLoading } = useQuery<WorkshopOrder[]>({
+    queryKey: ['/api/workshop-orders'],
+  });
+
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const createWorkshopOrderMutation = useMutation({
+    mutationFn: async (data: InsertWorkshopOrder) => {
+      const res = await apiRequest('POST', '/api/workshop-orders', data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workshop-orders'] });
+      toast({
+        title: "Workshop order created",
+        description: "The workshop order has been added successfully.",
+      });
+      setIsWorkshopDialogOpen(false);
+      setWorkshopFormData({
+        productId: '',
+        quantity: 1,
+        totalOrderValue: 0,
+        materialCost: 0,
+        woodCost: 0,
+        otherCosts: 0,
+        notes: ''
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create workshop order.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWorkshopOrderMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest('DELETE', `/api/workshop-orders/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workshop-orders'] });
+      toast({
+        title: "Workshop order deleted",
+        description: "The workshop order has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete workshop order.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateWorkshopOrder = () => {
+    if (!workshopFormData.productId) {
+      toast({
+        title: "Product required",
+        description: "Please select a product for the workshop order.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const productId = parseInt(workshopFormData.productId);
+    if (isNaN(productId)) {
+      toast({
+        title: "Invalid product",
+        description: "Please select a valid product.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (workshopFormData.quantity < 1) {
+      toast({
+        title: "Invalid quantity",
+        description: "Quantity must be at least 1.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (workshopFormData.totalOrderValue < 0 || 
+        workshopFormData.materialCost < 0 || 
+        workshopFormData.woodCost < 0 || 
+        workshopFormData.otherCosts < 0) {
+      toast({
+        title: "Invalid costs",
+        description: "All cost values must be zero or positive.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createWorkshopOrderMutation.mutate({
+      productId,
+      quantity: workshopFormData.quantity,
+      totalOrderValue: workshopFormData.totalOrderValue,
+      materialCost: workshopFormData.materialCost,
+      woodCost: workshopFormData.woodCost,
+      otherCosts: workshopFormData.otherCosts,
+      notes: workshopFormData.notes,
+    });
+  };
+
+  const getProductName = (productId: number) => {
+    const product = products.find(p => p.id === productId);
+    return product ? product.name : 'Unknown Product';
+  };
+
+  const calculateWorkshopPayment = (order: WorkshopOrder) => {
+    return order.totalOrderValue - order.materialCost - order.woodCost - order.otherCosts;
+  };
 
   const recentTransactions = transactions?.slice(0, 5) || [];
 
@@ -150,6 +300,232 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Workshop Orders
+            </CardTitle>
+            <CardDescription>Track orders and calculate workshop payments</CardDescription>
+          </div>
+          <Button onClick={() => setIsWorkshopDialogOpen(true)} data-testid="button-add-workshop-order">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Order
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {workshopOrdersLoading ? (
+            <p className="text-sm text-muted-foreground">Loading workshop orders...</p>
+          ) : workshopOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No workshop orders yet</p>
+          ) : (
+            <div className="space-y-4">
+              {workshopOrders.map((order) => {
+                const workshopPayment = calculateWorkshopPayment(order);
+                return (
+                  <div
+                    key={order.id}
+                    className="p-4 rounded-md border"
+                    data-testid={`workshop-order-${order.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold" data-testid={`text-product-name-${order.id}`}>
+                            {getProductName(order.productId)}
+                          </p>
+                          <Badge variant="secondary" data-testid={`badge-quantity-${order.id}`}>
+                            Qty: {order.quantity}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Total Order:</span>
+                            <span className="ml-2 font-medium tabular-nums" data-testid={`text-total-${order.id}`}>
+                              {formatCurrency(order.totalOrderValue)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Material:</span>
+                            <span className="ml-2 font-medium tabular-nums" data-testid={`text-material-${order.id}`}>
+                              {formatCurrency(order.materialCost)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Wood:</span>
+                            <span className="ml-2 font-medium tabular-nums" data-testid={`text-wood-${order.id}`}>
+                              {formatCurrency(order.woodCost)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Other:</span>
+                            <span className="ml-2 font-medium tabular-nums" data-testid={`text-other-${order.id}`}>
+                              {formatCurrency(order.otherCosts)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t">
+                          <span className="text-sm text-muted-foreground">Workshop Payment:</span>
+                          <span className="ml-2 text-lg font-bold text-chart-2 tabular-nums" data-testid={`text-payment-${order.id}`}>
+                            {formatCurrency(workshopPayment)}
+                          </span>
+                        </div>
+                        {order.notes && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-notes-${order.id}`}>
+                            Notes: {order.notes}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground" data-testid={`text-date-${order.id}`}>
+                          {format(new Date(order.date), 'MMM d, yyyy HH:mm')}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteWorkshopOrderMutation.mutate(order.id)}
+                        data-testid={`button-delete-order-${order.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isWorkshopDialogOpen} onOpenChange={setIsWorkshopDialogOpen}>
+        <DialogContent data-testid="dialog-add-workshop-order">
+          <DialogHeader>
+            <DialogTitle>Add Workshop Order</DialogTitle>
+            <DialogDescription>
+              Create a new workshop order to track costs and calculate payment
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="product">Product</Label>
+              <Select 
+                value={workshopFormData.productId} 
+                onValueChange={(value) => 
+                  setWorkshopFormData({ ...workshopFormData, productId: value })
+                }
+              >
+                <SelectTrigger id="product" data-testid="select-product">
+                  <SelectValue placeholder="Select a product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id.toString()}>
+                      {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                value={workshopFormData.quantity}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, quantity: parseInt(e.target.value) || 1 })}
+                data-testid="input-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="totalOrderValue">Total Order Value</Label>
+              <Input
+                id="totalOrderValue"
+                type="number"
+                min="0"
+                step="0.01"
+                value={workshopFormData.totalOrderValue}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, totalOrderValue: parseFloat(e.target.value) || 0 })}
+                data-testid="input-total-order"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="materialCost">Material Cost</Label>
+              <Input
+                id="materialCost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={workshopFormData.materialCost}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, materialCost: parseFloat(e.target.value) || 0 })}
+                data-testid="input-material-cost"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="woodCost">Wood Cost</Label>
+              <Input
+                id="woodCost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={workshopFormData.woodCost}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, woodCost: parseFloat(e.target.value) || 0 })}
+                data-testid="input-wood-cost"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="otherCosts">Other Costs</Label>
+              <Input
+                id="otherCosts"
+                type="number"
+                min="0"
+                step="0.01"
+                value={workshopFormData.otherCosts}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, otherCosts: parseFloat(e.target.value) || 0 })}
+                data-testid="input-other-costs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={workshopFormData.notes}
+                onChange={(e) => setWorkshopFormData({ ...workshopFormData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                data-testid="input-notes"
+              />
+            </div>
+            <div className="p-3 rounded-md bg-accent/50">
+              <p className="text-sm text-muted-foreground">Workshop Payment:</p>
+              <p className="text-lg font-bold text-chart-2 tabular-nums" data-testid="text-calculated-payment">
+                {formatCurrency(
+                  workshopFormData.totalOrderValue - 
+                  workshopFormData.materialCost - 
+                  workshopFormData.woodCost - 
+                  workshopFormData.otherCosts
+                )}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsWorkshopDialogOpen(false)}
+              data-testid="button-cancel"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateWorkshopOrder}
+              disabled={!workshopFormData.productId || createWorkshopOrderMutation.isPending}
+              data-testid="button-submit-order"
+            >
+              {createWorkshopOrderMutation.isPending ? "Creating..." : "Create Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
