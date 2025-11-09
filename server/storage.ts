@@ -53,6 +53,7 @@ export interface IStorage {
   getAllWorkshopOrders(): Promise<WorkshopOrder[]>;
   getWorkshopOrder(id: number): Promise<WorkshopOrder | undefined>;
   createWorkshopOrder(order: InsertWorkshopOrder): Promise<WorkshopOrder>;
+  updateWorkshopOrder(id: number, order: Partial<InsertWorkshopOrder>): Promise<WorkshopOrder>;
   deleteWorkshopOrder(id: number): Promise<void>;
 
   // Session store
@@ -236,6 +237,19 @@ export class MemStorage implements IStorage {
     return order;
   }
 
+  async updateWorkshopOrder(id: number, updates: Partial<InsertWorkshopOrder>): Promise<WorkshopOrder> {
+    const existing = this.workshopOrders.get(id);
+    if (!existing) {
+      throw new Error("Workshop order not found");
+    }
+    const updated: WorkshopOrder = {
+      ...existing,
+      ...updates,
+    };
+    this.workshopOrders.set(id, updated);
+    return updated;
+  }
+
   async deleteWorkshopOrder(id: number): Promise<void> {
     this.workshopOrders.delete(id);
   }
@@ -355,6 +369,17 @@ export class DbStorage implements IStorage {
 
   async createWorkshopOrder(insertOrder: InsertWorkshopOrder): Promise<WorkshopOrder> {
     const result = await db.insert(workshopOrders).values(insertOrder).returning();
+    return result[0];
+  }
+
+  async updateWorkshopOrder(id: number, updates: Partial<InsertWorkshopOrder>): Promise<WorkshopOrder> {
+    const result = await db.update(workshopOrders)
+      .set(updates)
+      .where(eq(workshopOrders.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error("Workshop order not found");
+    }
     return result[0];
   }
 

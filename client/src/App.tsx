@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
 import ProductDetail from "@/pages/product-detail";
 import Cashflow from "@/pages/cashflow";
+import WorkshopOrders from "@/pages/workshop-orders";
 import Settings from "@/pages/settings";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
@@ -22,6 +23,7 @@ function Router() {
       <ProtectedRoute path="/inventory" component={Inventory} />
       <ProtectedRoute path="/inventory/:id" component={ProductDetail} />
       <ProtectedRoute path="/cashflow" component={Cashflow} />
+      <ProtectedRoute path="/workshop-orders" component={WorkshopOrders} />
       <ProtectedRoute path="/settings" component={Settings} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />

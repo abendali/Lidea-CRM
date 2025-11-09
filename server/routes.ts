@@ -195,6 +195,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertWorkshopOrderSchema.partial().parse(req.body);
+      const order = await storage.updateWorkshopOrder(id, validatedData);
+      res.json(order);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
