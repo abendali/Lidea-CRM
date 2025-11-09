@@ -13,8 +13,13 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { db, pool } from "./db";
+import { eq, desc } from "drizzle-orm";
+import { products, stockMovements, cashflows, settings, users, workshopOrders } from "@shared/schema";
+import ConnectPgSimple from "connect-pg-simple";
 
 const MemoryStore = createMemoryStore(session);
+const PgSession = ConnectPgSimple(session);
 
 export interface IStorage {
   // Products
@@ -41,6 +46,7 @@ export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Workshop Orders
@@ -191,6 +197,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find(u => u.username === username);
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.email === email);
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const user: User = {
       id: this.userIdCounter++,
@@ -230,4 +240,126 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  sessionStore: session.SessionStore;
+
+  constructor() {
+    this.sessionStore = new PgSession({
+      pool: pool,
+      createTableIfMissing: true,
+    });
+  }
+
+  // Products
+  async getAllProducts(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const result = await db.select().from(products).where(eq(products.id, id));
+    return result[0];
+  }
+
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const result = await db.insert(products).values(insertProduct).returning();
+    return result[0];
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
+  async updateProductStock(id: number, newStock: number): Promise<Product> {
+    const result = await db.update(products).set({ stock: newStock }).where(eq(products.id, id)).returning();
+    return result[0];
+  }
+
+  // Stock Movements
+  async getAllStockMovements(): Promise<StockMovement[]> {
+    return await db.select().from(stockMovements).orderBy(desc(stockMovements.date));
+  }
+
+  async getStockMovementsByProduct(productId: number): Promise<StockMovement[]> {
+    return await db.select().from(stockMovements).where(eq(stockMovements.productId, productId)).orderBy(desc(stockMovements.date));
+  }
+
+  async createStockMovement(movement: InsertStockMovement): Promise<StockMovement> {
+    const result = await db.insert(stockMovements).values(movement).returning();
+    return result[0];
+  }
+
+  // Cashflows
+  async getAllCashflows(): Promise<Cashflow[]> {
+    return await db.select().from(cashflows).orderBy(desc(cashflows.date));
+  }
+
+  async getCashflow(id: number): Promise<Cashflow | undefined> {
+    const result = await db.select().from(cashflows).where(eq(cashflows.id, id));
+    return result[0];
+  }
+
+  async createCashflow(insertCashflow: InsertCashflow): Promise<Cashflow> {
+    const result = await db.insert(cashflows).values(insertCashflow).returning();
+    return result[0];
+  }
+
+  // Settings
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const result = await db.select().from(settings).where(eq(settings.key, key));
+    return result[0];
+  }
+
+  async setSetting(key: string, value: string): Promise<Setting> {
+    const existing = await this.getSetting(key);
+    
+    if (existing) {
+      const result = await db.update(settings).set({ value }).where(eq(settings.key, key)).returning();
+      return result[0];
+    } else {
+      const result = await db.insert(settings).values({ key, value }).returning();
+      return result[0];
+    }
+  }
+
+  // Users
+  async getUser(id: number): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email));
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Workshop Orders
+  async getAllWorkshopOrders(): Promise<WorkshopOrder[]> {
+    return await db.select().from(workshopOrders).orderBy(desc(workshopOrders.date));
+  }
+
+  async getWorkshopOrder(id: number): Promise<WorkshopOrder | undefined> {
+    const result = await db.select().from(workshopOrders).where(eq(workshopOrders.id, id));
+    return result[0];
+  }
+
+  async createWorkshopOrder(insertOrder: InsertWorkshopOrder): Promise<WorkshopOrder> {
+    const result = await db.insert(workshopOrders).values(insertOrder).returning();
+    return result[0];
+  }
+
+  async deleteWorkshopOrder(id: number): Promise<void> {
+    await db.delete(workshopOrders).where(eq(workshopOrders.id, id));
+  }
+}
+
+export const storage = new DbStorage();

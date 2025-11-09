@@ -40,6 +40,7 @@ export const settings = pgTable("settings", {
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
 });
 
@@ -90,6 +91,7 @@ export type Setting = typeof settings.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3).max(50),
+  email: z.string().email("Invalid email address"),
   password: z.string().min(6),
 }).omit({
   id: true,
