@@ -15,7 +15,7 @@ import warehouseUrl from "@assets/image_1762252583003.png";
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [registerData, setRegisterData] = useState({ username: "", password: "" });
+  const [registerData, setRegisterData] = useState({ username: "", email: "", password: "" });
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const { toast } = useToast();
@@ -130,6 +130,19 @@ export default function AuthPage() {
                         data-testid="input-register-username"
                       />
                       <p className="text-xs text-muted-foreground">At least 3 characters</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="register-email">Email Address</Label>
+                      <Input
+                        id="register-email"
+                        type="email"
+                        placeholder="your.email@example.com"
+                        value={registerData.email}
+                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                        required
+                        data-testid="input-register-email"
+                      />
+                      <p className="text-xs text-muted-foreground">Used for password recovery</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="register-password">Password</Label>
