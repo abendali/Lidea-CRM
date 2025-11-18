@@ -73,8 +73,7 @@ export function StockMovementModal({
             <Label htmlFor="quantity">Quantity</Label>
             <Input
               id="quantity"
-              type="number"
-              min="1"
+              type="text"
               placeholder="Enter quantity"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}

@@ -276,8 +276,7 @@ export default function ProductDetail() {
               <Label htmlFor="quantity">Quantity</Label>
               <Input
                 id="quantity"
-                type="number"
-                min="1"
+                type="text"
                 value={stockFormData.quantity}
                 onChange={(e) => {
                   const val = parseInt(e.target.value);

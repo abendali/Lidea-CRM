@@ -185,8 +185,7 @@ export default function CashflowPage() {
               {isEditingCapital ? (
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={capitalInput}
                     onChange={(e) => setCapitalInput(e.target.value)}
                     className="w-32"

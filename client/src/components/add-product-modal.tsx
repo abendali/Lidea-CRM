@@ -76,9 +76,7 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
             <Label htmlFor="price">Estimated Price (د.ج)</Label>
             <Input
               id="price"
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
               placeholder="0.00"
               value={estimatedPrice}
               onChange={(e) => setEstimatedPrice(e.target.value)}
@@ -89,8 +87,7 @@ export function AddProductModal({ open, onOpenChange, onConfirm }: AddProductMod
             <Label htmlFor="stock">Initial Stock</Label>
             <Input
               id="stock"
-              type="number"
-              min="0"
+              type="text"
               placeholder="0"
               value={stock}
               onChange={(e) => setStock(e.target.value)}

@@ -431,8 +431,7 @@ export default function Dashboard() {
               <Label htmlFor="quantity">Quantity</Label>
               <Input
                 id="quantity"
-                type="number"
-                min="1"
+                type="text"
                 value={workshopFormData.quantity}
                 onChange={(e) => setWorkshopFormData({ ...workshopFormData, quantity: parseInt(e.target.value) || 1 })}
                 data-testid="input-quantity"
@@ -442,9 +441,7 @@ export default function Dashboard() {
               <Label htmlFor="totalOrderValue">Total Order Value</Label>
               <Input
                 id="totalOrderValue"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
                 value={workshopFormData.totalOrderValue}
                 onChange={(e) => setWorkshopFormData({ ...workshopFormData, totalOrderValue: parseFloat(e.target.value) || 0 })}
                 data-testid="input-total-order"
@@ -454,9 +451,7 @@ export default function Dashboard() {
               <Label htmlFor="materialCost">Material Cost</Label>
               <Input
                 id="materialCost"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
                 value={workshopFormData.materialCost}
                 onChange={(e) => setWorkshopFormData({ ...workshopFormData, materialCost: parseFloat(e.target.value) || 0 })}
                 data-testid="input-material-cost"
@@ -466,9 +461,7 @@ export default function Dashboard() {
               <Label htmlFor="woodCost">Wood Cost</Label>
               <Input
                 id="woodCost"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
                 value={workshopFormData.woodCost}
                 onChange={(e) => setWorkshopFormData({ ...workshopFormData, woodCost: parseFloat(e.target.value) || 0 })}
                 data-testid="input-wood-cost"
@@ -478,9 +471,7 @@ export default function Dashboard() {
               <Label htmlFor="otherCosts">Other Costs</Label>
               <Input
                 id="otherCosts"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
                 value={workshopFormData.otherCosts}
                 onChange={(e) => setWorkshopFormData({ ...workshopFormData, otherCosts: parseFloat(e.target.value) || 0 })}
                 data-testid="input-other-costs"

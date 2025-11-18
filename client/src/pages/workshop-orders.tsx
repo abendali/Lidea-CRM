@@ -256,7 +256,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Quantity</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-quantity"
@@ -274,8 +274,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Total Order Value</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-total-value"
@@ -295,8 +294,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Material Cost</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-material-cost"
@@ -314,8 +312,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Wood Cost</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-wood-cost"
@@ -333,8 +330,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Other Costs</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-other-costs"
@@ -512,7 +508,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Quantity</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-edit-quantity"
@@ -530,8 +526,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Total Order Value</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-edit-total-value"
@@ -551,8 +546,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Material Cost</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-edit-material-cost"
@@ -570,8 +564,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Wood Cost</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-edit-wood-cost"
@@ -589,8 +582,7 @@ export default function WorkshopOrders() {
                         <FormLabel>Other Costs</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
                             value={field.value}
                             onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                             data-testid="input-edit-other-costs"
