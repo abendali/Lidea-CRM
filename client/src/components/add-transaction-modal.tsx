@@ -60,7 +60,7 @@ export function AddTransactionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" data-testid="modal-add-transaction">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" data-testid="modal-add-transaction">
         <DialogHeader>
           <DialogTitle>
             Add {type === 'income' ? 'Income' : 'Expense'}

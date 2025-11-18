@@ -248,7 +248,7 @@ export default function WorkshopOrders() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={createForm.control}
                     name="quantity"
@@ -286,7 +286,7 @@ export default function WorkshopOrders() {
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={createForm.control}
                     name="materialCost"
@@ -382,62 +382,112 @@ export default function WorkshopOrders() {
         <CardHeader>
           <CardTitle>All Workshop Orders</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 md:p-6">
           {orders.length === 0 ? (
-            <p className="text-muted-foreground" data-testid="text-no-orders">
+            <p className="text-muted-foreground p-6" data-testid="text-no-orders">
               No workshop orders yet. Create your first order to get started.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Created By</TableHead>
-                  <TableHead>Order Value</TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Wood</TableHead>
-                  <TableHead>Other</TableHead>
-                  <TableHead>Total Cost</TableHead>
-                  <TableHead>Profit</TableHead>
-                  <TableHead>Margin %</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Created By</TableHead>
+                      <TableHead>Order Value</TableHead>
+                      <TableHead>Material</TableHead>
+                      <TableHead>Wood</TableHead>
+                      <TableHead>Other</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                      <TableHead>Profit</TableHead>
+                      <TableHead>Margin %</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order) => {
+                      const totalCost = order.materialCost + order.woodCost + order.otherCosts;
+                      const profit = calculateProfit(order);
+                      const margin = calculateProfitMargin(order);
+
+                      return (
+                        <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                          <TableCell>{format(new Date(order.date), "MMM dd, yyyy")}</TableCell>
+                          <TableCell data-testid={`text-product-${order.id}`}>
+                            {getProductName(order.productId)}
+                          </TableCell>
+                          <TableCell>{order.quantity}</TableCell>
+                          <TableCell className="text-muted-foreground">{getUserName(order.createdBy)}</TableCell>
+                          <TableCell>{formatCurrency(order.totalOrderValue)}</TableCell>
+                          <TableCell>{formatCurrency(order.materialCost)}</TableCell>
+                          <TableCell>{formatCurrency(order.woodCost)}</TableCell>
+                          <TableCell>{formatCurrency(order.otherCosts)}</TableCell>
+                          <TableCell>{formatCurrency(totalCost)}</TableCell>
+                          <TableCell
+                            className={profit >= 0 ? "text-green-600" : "text-red-600"}
+                            data-testid={`text-profit-${order.id}`}
+                          >
+                            {formatCurrency(profit)}
+                          </TableCell>
+                          <TableCell
+                            className={margin >= 0 ? "text-green-600" : "text-red-600"}
+                            data-testid={`text-margin-${order.id}`}
+                          >
+                            {margin.toFixed(1)}%
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEdit(order)}
+                                data-testid={`button-edit-${order.id}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleDelete(order.id)}
+                                data-testid={`button-delete-${order.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile/Tablet Card View */}
+              <div className="md:hidden divide-y">
                 {orders.map((order) => {
                   const totalCost = order.materialCost + order.woodCost + order.otherCosts;
                   const profit = calculateProfit(order);
                   const margin = calculateProfitMargin(order);
 
                   return (
-                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                      <TableCell>{format(new Date(order.date), "MMM dd, yyyy")}</TableCell>
-                      <TableCell data-testid={`text-product-${order.id}`}>
-                        {getProductName(order.productId)}
-                      </TableCell>
-                      <TableCell>{order.quantity}</TableCell>
-                      <TableCell className="text-muted-foreground">{getUserName(order.createdBy)}</TableCell>
-                      <TableCell>{formatCurrency(order.totalOrderValue)}</TableCell>
-                      <TableCell>{formatCurrency(order.materialCost)}</TableCell>
-                      <TableCell>{formatCurrency(order.woodCost)}</TableCell>
-                      <TableCell>{formatCurrency(order.otherCosts)}</TableCell>
-                      <TableCell>{formatCurrency(totalCost)}</TableCell>
-                      <TableCell
-                        className={profit >= 0 ? "text-green-600" : "text-red-600"}
-                        data-testid={`text-profit-${order.id}`}
-                      >
-                        {formatCurrency(profit)}
-                      </TableCell>
-                      <TableCell
-                        className={margin >= 0 ? "text-green-600" : "text-red-600"}
-                        data-testid={`text-margin-${order.id}`}
-                      >
-                        {margin.toFixed(1)}%
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+                    <div key={order.id} className="p-4" data-testid={`row-order-${order.id}`}>
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm" data-testid={`text-product-${order.id}`}>
+                            {getProductName(order.productId)}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(order.date), "MMM dd, yyyy")} • Qty: {order.quantity}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            By: {getUserName(order.createdBy)}
+                          </p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
                           <Button
                             size="icon"
                             variant="ghost"
@@ -455,19 +505,61 @@ export default function WorkshopOrders() {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div>
+                          <span className="text-muted-foreground">Order Value:</span>
+                          <span className="ml-1 font-medium tabular-nums">{formatCurrency(order.totalOrderValue)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Material:</span>
+                          <span className="ml-1 font-medium tabular-nums">{formatCurrency(order.materialCost)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Wood:</span>
+                          <span className="ml-1 font-medium tabular-nums">{formatCurrency(order.woodCost)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Other:</span>
+                          <span className="ml-1 font-medium tabular-nums">{formatCurrency(order.otherCosts)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Total Cost:</span>
+                          <span className="ml-1 font-medium tabular-nums">{formatCurrency(totalCost)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <div>
+                          <span className="text-xs text-muted-foreground">Profit:</span>
+                          <span 
+                            className={`ml-1 text-sm font-semibold tabular-nums ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                            data-testid={`text-profit-${order.id}`}
+                          >
+                            {formatCurrency(profit)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Margin:</span>
+                          <span 
+                            className={`ml-1 text-sm font-semibold tabular-nums ${margin >= 0 ? "text-green-600" : "text-red-600"}`}
+                            data-testid={`text-margin-${order.id}`}
+                          >
+                            {margin.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {editingOrder && (
         <Dialog open={!!editingOrder} onOpenChange={() => setEditingOrder(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Workshop Order</DialogTitle>
             </DialogHeader>
@@ -500,7 +592,7 @@ export default function WorkshopOrders() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={editForm.control}
                     name="quantity"
@@ -538,7 +630,7 @@ export default function WorkshopOrders() {
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={editForm.control}
                     name="materialCost"

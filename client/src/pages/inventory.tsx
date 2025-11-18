@@ -176,54 +176,103 @@ export default function Inventory() {
               {searchTerm ? 'No products found matching your search.' : 'No products yet. Add your first product to get started.'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Unit Price</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Stock</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Total Value</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product) => (
-                    <tr 
-                      key={product.id} 
-                      className="border-b last:border-0 hover-elevate cursor-pointer" 
-                      onClick={() => setLocation(`/inventory/${product.id}`)}
-                      data-testid={`row-product-${product.id}`}
-                    >
-                      <td className="p-4 text-sm font-medium">{product.name}</td>
-                      <td className="p-4 text-sm">{product.category}</td>
-                      <td className="p-4 text-sm text-right tabular-nums">{formatCurrency(product.estimatedPrice)}</td>
-                      <td className="p-4 text-sm text-right tabular-nums">
-                        <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Unit Price</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Stock</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Total Value</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((product) => (
+                      <tr 
+                        key={product.id} 
+                        className="border-b last:border-0 hover-elevate cursor-pointer" 
+                        onClick={() => setLocation(`/inventory/${product.id}`)}
+                        data-testid={`row-product-${product.id}`}
+                      >
+                        <td className="p-4 text-sm font-medium">{product.name}</td>
+                        <td className="p-4 text-sm">{product.category}</td>
+                        <td className="p-4 text-sm text-right tabular-nums">{formatCurrency(product.estimatedPrice)}</td>
+                        <td className="p-4 text-sm text-right tabular-nums">
+                          <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
+                            {product.stock}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm text-right tabular-nums font-semibold">
+                          {formatCurrency(product.estimatedPrice * product.stock)}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
+                              data-testid={`button-delete-${product.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {filteredProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="p-4 hover-elevate cursor-pointer"
+                    onClick={() => setLocation(`/inventory/${product.id}`)}
+                    data-testid={`row-product-${product.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{product.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">{product.category}</p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
+                        data-testid={`button-delete-${product.id}`}
+                        className="shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Price:</span>
+                        <span className="ml-2 font-medium tabular-nums">{formatCurrency(product.estimatedPrice)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Stock:</span>
+                        <span className={`ml-2 font-medium tabular-nums ${product.stock < 10 ? 'text-destructive font-semibold' : ''}`}>
                           {product.stock}
                         </span>
-                      </td>
-                      <td className="p-4 text-sm text-right tabular-nums font-semibold">
-                        {formatCurrency(product.estimatedPrice * product.stock)}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
-                            data-testid={`button-delete-${product.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Total Value:</span>
+                        <span className="ml-2 font-semibold tabular-nums">
+                          {formatCurrency(product.estimatedPrice * product.stock)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

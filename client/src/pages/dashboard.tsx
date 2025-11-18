@@ -302,7 +302,7 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+        <CardHeader className="flex flex-col gap-4 space-y-0 pb-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
@@ -310,7 +310,7 @@ export default function Dashboard() {
             </CardTitle>
             <CardDescription>Track orders and calculate workshop payments</CardDescription>
           </div>
-          <Button onClick={() => setIsWorkshopDialogOpen(true)} data-testid="button-add-workshop-order">
+          <Button onClick={() => setIsWorkshopDialogOpen(true)} data-testid="button-add-workshop-order" className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Order
           </Button>
@@ -340,7 +340,7 @@ export default function Dashboard() {
                             Qty: {order.quantity}
                           </Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Total Order:</span>
                             <span className="ml-2 font-medium tabular-nums" data-testid={`text-total-${order.id}`}>
@@ -399,7 +399,7 @@ export default function Dashboard() {
       </Card>
 
       <Dialog open={isWorkshopDialogOpen} onOpenChange={setIsWorkshopDialogOpen}>
-        <DialogContent data-testid="dialog-add-workshop-order">
+        <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid="dialog-add-workshop-order">
           <DialogHeader>
             <DialogTitle>Add Workshop Order</DialogTitle>
             <DialogDescription>

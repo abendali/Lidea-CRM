@@ -162,14 +162,16 @@ export default function CashflowPage() {
             Monitor your income and expenses
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => openAddTransaction('income')} data-testid="button-add-income">
             <PlusCircle className="h-4 w-4 mr-2" />
-            Add Income
+            <span className="hidden sm:inline">Add Income</span>
+            <span className="sm:hidden">Income</span>
           </Button>
           <Button variant="secondary" onClick={() => openAddTransaction('expense')} data-testid="button-add-expense">
             <MinusCircle className="h-4 w-4 mr-2" />
-            Add Expense
+            <span className="hidden sm:inline">Add Expense</span>
+            <span className="sm:hidden">Expense</span>
           </Button>
         </div>
       </div>
@@ -179,32 +181,35 @@ export default function CashflowPage() {
           <CardTitle>Balance Overview</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b">
-            <div>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b">
+            <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-1">Initial Capital</p>
               {isEditingCapital ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
                   <Input
                     type="text"
                     value={capitalInput}
                     onChange={(e) => setCapitalInput(e.target.value)}
-                    className="w-32"
+                    className="w-full"
                     data-testid="input-initial-capital"
                   />
-                  <Button size="sm" onClick={handleSaveCapital} data-testid="button-save-capital">
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setIsEditingCapital(false);
-                      setCapitalInput(initialCapital.toString());
-                    }}
-                    data-testid="button-cancel-capital"
-                  >
-                    Cancel
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button className="flex-1" size="sm" onClick={handleSaveCapital} data-testid="button-save-capital">
+                      Save
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsEditingCapital(false);
+                        setCapitalInput(initialCapital.toString());
+                      }}
+                      data-testid="button-cancel-capital"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -222,7 +227,7 @@ export default function CashflowPage() {
                 </div>
               )}
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-1">Current Capital</p>
               <p className={`text-2xl font-bold tabular-nums ${currentCapital >= initialCapital ? 'text-chart-2' : 'text-destructive'}`} data-testid="text-current-capital">
                 {formatCurrency(currentCapital)}
@@ -295,40 +300,70 @@ export default function CashflowPage() {
                 : 'No transactions yet. Add your first transaction to get started.'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Created By</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransactions.map((transaction) => (
-                    <tr key={transaction.id} className="border-b last:border-0" data-testid={`row-transaction-${transaction.id}`}>
-                      <td className="p-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
-                      <td className="p-4">
-                        <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'}>
-                          {transaction.type}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-sm">{transaction.category}</td>
-                      <td className="p-4 text-sm">{transaction.description}</td>
-                      <td className="p-4 text-sm text-muted-foreground">{getUserName(transaction.createdBy)}</td>
-                      <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Created By</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTransactions.map((transaction) => (
+                      <tr key={transaction.id} className="border-b last:border-0" data-testid={`row-transaction-${transaction.id}`}>
+                        <td className="p-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
+                        <td className="p-4">
+                          <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'}>
+                            {transaction.type}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm">{transaction.category}</td>
+                        <td className="p-4 text-sm">{transaction.description}</td>
+                        <td className="p-4 text-sm text-muted-foreground">{getUserName(transaction.createdBy)}</td>
+                        <td className={`p-4 text-sm text-right tabular-nums font-semibold ${
+                          transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
+                        }`}>
+                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {filteredTransactions.map((transaction) => (
+                  <div key={transaction.id} className="p-4" data-testid={`row-transaction-${transaction.id}`}>
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'}>
+                            {transaction.type}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{transaction.category}</span>
+                        </div>
+                        <p className="text-sm font-medium">{transaction.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(transaction.date).toLocaleDateString()} • {getUserName(transaction.createdBy)}
+                        </p>
+                      </div>
+                      <div className={`text-right font-semibold tabular-nums shrink-0 ${
                         transaction.type === 'income' ? 'text-chart-2' : 'text-destructive'
                       }`}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

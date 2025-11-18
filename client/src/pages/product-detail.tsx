@@ -247,7 +247,7 @@ export default function ProductDetail() {
       </div>
 
       <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
-        <DialogContent data-testid="dialog-update-stock">
+        <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid="dialog-update-stock">
           <DialogHeader>
             <DialogTitle>Update Stock</DialogTitle>
             <DialogDescription>
