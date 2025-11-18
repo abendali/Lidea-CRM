@@ -43,6 +43,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 export default function WorkshopOrders() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -418,16 +419,16 @@ export default function WorkshopOrders() {
                       </TableCell>
                       <TableCell>{order.quantity}</TableCell>
                       <TableCell className="text-muted-foreground">{getUserName(order.createdBy)}</TableCell>
-                      <TableCell>${order.totalOrderValue.toFixed(2)}</TableCell>
-                      <TableCell>${order.materialCost.toFixed(2)}</TableCell>
-                      <TableCell>${order.woodCost.toFixed(2)}</TableCell>
-                      <TableCell>${order.otherCosts.toFixed(2)}</TableCell>
-                      <TableCell>${totalCost.toFixed(2)}</TableCell>
+                      <TableCell>{formatCurrency(order.totalOrderValue)}</TableCell>
+                      <TableCell>{formatCurrency(order.materialCost)}</TableCell>
+                      <TableCell>{formatCurrency(order.woodCost)}</TableCell>
+                      <TableCell>{formatCurrency(order.otherCosts)}</TableCell>
+                      <TableCell>{formatCurrency(totalCost)}</TableCell>
                       <TableCell
                         className={profit >= 0 ? "text-green-600" : "text-red-600"}
                         data-testid={`text-profit-${order.id}`}
                       >
-                        ${profit.toFixed(2)}
+                        {formatCurrency(profit)}
                       </TableCell>
                       <TableCell
                         className={margin >= 0 ? "text-green-600" : "text-red-600"}
