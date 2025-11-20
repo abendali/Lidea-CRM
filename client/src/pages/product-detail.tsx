@@ -1,10 +1,10 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Product, StockMovement, InsertStockMovement } from "@shared/schema";
+import { Product, StockMovement, InsertStockMovement, ProductStock, InsertProductStock } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, TrendingDown, Package } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Package, Warehouse, Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,6 +37,12 @@ export default function ProductDetail() {
     reason: '',
     note: ''
   });
+  const [isProductStockDialogOpen, setIsProductStockDialogOpen] = useState(false);
+  const [productStockFormData, setProductStockFormData] = useState({
+    color: '',
+    quantity: 1,
+    workshop: ''
+  });
 
   const productId = params?.id ? parseInt(params.id) : undefined;
 
@@ -50,6 +56,16 @@ export default function ProductDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/stock-movements?productId=${productId}`);
       if (!res.ok) throw new Error('Failed to fetch stock movements');
+      return res.json();
+    },
+    enabled: !!productId,
+  });
+
+  const { data: productStocks = [], isLoading: productStocksLoading } = useQuery<ProductStock[]>({
+    queryKey: ["/api/product-stock", { productId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/product-stock?productId=${productId}`);
+      if (!res.ok) throw new Error('Failed to fetch product stock');
       return res.json();
     },
     enabled: !!productId,
@@ -74,6 +90,56 @@ export default function ProductDetail() {
     onError: (error: Error) => {
       toast({
         title: "Failed to update stock",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addProductStockMutation = useMutation({
+    mutationFn: async (data: InsertProductStock) => {
+      const res = await apiRequest("POST", "/api/product-stock", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stock", { productId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products", productId] });
+      toast({
+        title: "Stock added",
+        description: "Product stock entry added successfully",
+      });
+      setIsProductStockDialogOpen(false);
+      setProductStockFormData({ color: '', quantity: 1, workshop: '' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add stock",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProductStockMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/product-stock/${id}`, undefined);
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stock", { productId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products", productId] });
+      toast({
+        title: "Stock deleted",
+        description: "Product stock entry deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete stock",
         description: error.message,
         variant: "destructive",
       });
@@ -113,6 +179,42 @@ export default function ProductDetail() {
     stockMovementMutation.mutate({
       productId,
       ...stockFormData,
+    });
+  };
+
+  const handleAddProductStock = () => {
+    if (!productId) return;
+    
+    if (!productStockFormData.color.trim()) {
+      toast({
+        title: "Color required",
+        description: "Please enter a color.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!productStockFormData.workshop.trim()) {
+      toast({
+        title: "Workshop required",
+        description: "Please enter a workshop location.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (productStockFormData.quantity < 1) {
+      toast({
+        title: "Invalid quantity",
+        description: "Quantity must be at least 1.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addProductStockMutation.mutate({
+      productId,
+      ...productStockFormData,
     });
   };
 
@@ -246,6 +348,72 @@ export default function ProductDetail() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Warehouse className="h-5 w-5" />
+                Stock by Location
+              </CardTitle>
+              <CardDescription>Stock distributed across workshops by color</CardDescription>
+            </div>
+            <Button 
+              onClick={() => setIsProductStockDialogOpen(true)}
+              data-testid="button-add-product-stock"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Stock
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {productStocksLoading ? (
+            <div className="text-center text-muted-foreground">Loading stock...</div>
+          ) : productStocks.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              No stock entries yet
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {productStocks.map((stock) => (
+                <div 
+                  key={stock.id} 
+                  className="p-4 rounded-md border bg-card"
+                  data-testid={`stock-${stock.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="outline" data-testid={`stock-color-${stock.id}`}>
+                          {stock.color}
+                        </Badge>
+                        <span className="text-lg font-bold tabular-nums" data-testid={`stock-quantity-${stock.id}`}>
+                          {stock.quantity}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate" data-testid={`stock-workshop-${stock.id}`}>
+                        <Warehouse className="h-3 w-3 inline mr-1" />
+                        {stock.workshop}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteProductStockMutation.mutate(stock.id)}
+                      disabled={deleteProductStockMutation.isPending}
+                      data-testid={`button-delete-stock-${stock.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid="dialog-update-stock">
           <DialogHeader>
@@ -342,6 +510,73 @@ export default function ProductDetail() {
               data-testid="button-submit-movement"
             >
               {stockMovementMutation.isPending ? "Updating..." : "Update Stock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isProductStockDialogOpen} onOpenChange={setIsProductStockDialogOpen}>
+        <DialogContent data-testid="dialog-add-product-stock">
+          <DialogHeader>
+            <DialogTitle>Add Product Stock</DialogTitle>
+            <DialogDescription>
+              Add stock entry with color and workshop location for {product.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="color">Color</Label>
+              <Input
+                id="color"
+                value={productStockFormData.color}
+                onChange={(e) => setProductStockFormData({ ...productStockFormData, color: e.target.value })}
+                placeholder="e.g., Pink, Grey, Blue"
+                data-testid="input-stock-color"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stock-quantity">Quantity</Label>
+              <Input
+                id="stock-quantity"
+                type="number"
+                min="1"
+                value={productStockFormData.quantity}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setProductStockFormData({ ...productStockFormData, quantity: val > 0 ? val : 1 });
+                }}
+                data-testid="input-stock-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workshop">Workshop</Label>
+              <Input
+                id="workshop"
+                value={productStockFormData.workshop}
+                onChange={(e) => setProductStockFormData({ ...productStockFormData, workshop: e.target.value })}
+                placeholder="e.g., Omar's, Main Workshop, Warehouse A"
+                data-testid="input-stock-workshop"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsProductStockDialogOpen(false)}
+              data-testid="button-cancel-stock"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddProductStock}
+              disabled={
+                !productStockFormData.color.trim() || 
+                !productStockFormData.workshop.trim() || 
+                addProductStockMutation.isPending
+              }
+              data-testid="button-submit-stock"
+            >
+              {addProductStockMutation.isPending ? "Adding..." : "Add Stock"}
             </Button>
           </DialogFooter>
         </DialogContent>

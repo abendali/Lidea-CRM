@@ -63,6 +63,15 @@ export const workshopOrders = pgTable("workshop_orders", {
   createdBy: integer("created_by").references(() => users.id),
 });
 
+export const productStock = pgTable("product_stock", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: 'cascade' }),
+  color: text("color").notNull(),
+  quantity: integer("quantity").notNull(),
+  workshop: text("workshop").notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
 export const insertProductSchema = createInsertSchema(products, {
   estimatedPrice: z.number().min(0),
   stock: z.number().int().min(0),
@@ -122,6 +131,15 @@ export const insertWorkshopOrderSchema = createInsertSchema(workshopOrders, {
   createdBy: true,
 });
 
+export const insertProductStockSchema = createInsertSchema(productStock, {
+  quantity: z.number().int().min(1),
+  color: z.string().min(1, "Color is required"),
+  workshop: z.string().min(1, "Workshop is required"),
+}).omit({
+  id: true,
+  createdBy: true,
+});
+
 export const updateUserSchema = z.object({
   username: z.string().min(3).max(50).optional(),
   email: z.string().email("Invalid email address").optional(),
@@ -136,3 +154,6 @@ export type User = typeof users.$inferSelect;
 
 export type InsertWorkshopOrder = z.infer<typeof insertWorkshopOrderSchema>;
 export type WorkshopOrder = typeof workshopOrders.$inferSelect;
+
+export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
+export type ProductStock = typeof productStock.$inferSelect;

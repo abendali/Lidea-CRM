@@ -1,10 +1,10 @@
 import { MetricCard } from "@/components/metric-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Package, DollarSign, TrendingUp, AlertCircle, Wrench, Plus, Trash2 } from "lucide-react";
+import { Package, DollarSign, TrendingUp, AlertCircle, Wrench, Plus, Trash2, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Cashflow, WorkshopOrder, Product, InsertWorkshopOrder } from "@shared/schema";
+import type { Cashflow, WorkshopOrder, Product, InsertWorkshopOrder, ProductStock } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 import { useState } from "react";
 import {
@@ -58,6 +58,10 @@ export default function Dashboard() {
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['/api/products'],
+  });
+
+  const { data: productStocks = [] } = useQuery<ProductStock[]>({
+    queryKey: ['/api/product-stock'],
   });
 
   const createWorkshopOrderMutation = useMutation({
@@ -393,6 +397,65 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Warehouse className="h-5 w-5" />
+            Stock by Location
+          </CardTitle>
+          <CardDescription>Product inventory across workshops</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {productStocks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No stock entries yet</p>
+          ) : (
+            <div className="space-y-6">
+              {products
+                .filter((product) => productStocks.some((stock) => stock.productId === product.id))
+                .map((product) => {
+                  const stocks = productStocks.filter((stock) => stock.productId === product.id);
+                  const totalQuantity = stocks.reduce((sum, stock) => sum + stock.quantity, 0);
+                  
+                  return (
+                    <div key={product.id} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold" data-testid={`product-name-${product.id}`}>{product.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Total: <span className="font-medium tabular-nums">{totalQuantity}</span> units
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                        {stocks.map((stock) => (
+                          <div 
+                            key={stock.id} 
+                            className="p-3 rounded-md border bg-card"
+                            data-testid={`dashboard-stock-${stock.id}`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" data-testid={`dashboard-stock-color-${stock.id}`}>
+                                {stock.color}
+                              </Badge>
+                              <span className="font-bold tabular-nums" data-testid={`dashboard-stock-quantity-${stock.id}`}>
+                                {stock.quantity}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate" data-testid={`dashboard-stock-workshop-${stock.id}`}>
+                              <Warehouse className="h-3 w-3 inline mr-1" />
+                              {stock.workshop}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </CardContent>

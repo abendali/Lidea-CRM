@@ -10,13 +10,15 @@ import {
   type InsertUser,
   type UpdateUser,
   type WorkshopOrder,
-  type InsertWorkshopOrder
+  type InsertWorkshopOrder,
+  type ProductStock,
+  type InsertProductStock
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
 import { eq, desc } from "drizzle-orm";
-import { products, stockMovements, cashflows, settings, users, workshopOrders } from "@shared/schema";
+import { products, stockMovements, cashflows, settings, users, workshopOrders, productStock } from "@shared/schema";
 import ConnectPgSimple from "connect-pg-simple";
 
 const MemoryStore = createMemoryStore(session);
@@ -59,6 +61,14 @@ export interface IStorage {
   updateWorkshopOrder(id: number, order: Partial<InsertWorkshopOrder>): Promise<WorkshopOrder>;
   deleteWorkshopOrder(id: number): Promise<void>;
 
+  // Product Stock
+  getAllProductStock(): Promise<ProductStock[]>;
+  getProductStockByProduct(productId: number): Promise<ProductStock[]>;
+  getProductStock(id: number): Promise<ProductStock | undefined>;
+  createProductStock(stock: InsertProductStock & { createdBy: number }): Promise<ProductStock>;
+  updateProductStockEntry(id: number, stock: Partial<InsertProductStock>): Promise<ProductStock>;
+  deleteProductStock(id: number): Promise<void>;
+
   // Session store
   sessionStore: session.SessionStore;
 }
@@ -70,6 +80,7 @@ export class MemStorage implements IStorage {
   private settings: Map<string, Setting> = new Map();
   private users: Map<number, User> = new Map();
   private workshopOrders: Map<number, WorkshopOrder> = new Map();
+  private productStocks: Map<number, ProductStock> = new Map();
   
   private productIdCounter = 1;
   private stockMovementIdCounter = 1;
@@ -77,6 +88,7 @@ export class MemStorage implements IStorage {
   private settingIdCounter = 1;
   private userIdCounter = 1;
   private workshopOrderIdCounter = 1;
+  private productStockIdCounter = 1;
 
   sessionStore: session.SessionStore;
 
@@ -274,6 +286,45 @@ export class MemStorage implements IStorage {
   async deleteWorkshopOrder(id: number): Promise<void> {
     this.workshopOrders.delete(id);
   }
+
+  // Product Stock
+  async getAllProductStock(): Promise<ProductStock[]> {
+    return Array.from(this.productStocks.values());
+  }
+
+  async getProductStockByProduct(productId: number): Promise<ProductStock[]> {
+    return Array.from(this.productStocks.values()).filter(s => s.productId === productId);
+  }
+
+  async getProductStock(id: number): Promise<ProductStock | undefined> {
+    return this.productStocks.get(id);
+  }
+
+  async createProductStock(insertStock: InsertProductStock & { createdBy: number }): Promise<ProductStock> {
+    const stock: ProductStock = {
+      id: this.productStockIdCounter++,
+      ...insertStock,
+    };
+    this.productStocks.set(stock.id, stock);
+    return stock;
+  }
+
+  async updateProductStockEntry(id: number, updates: Partial<InsertProductStock>): Promise<ProductStock> {
+    const existing = this.productStocks.get(id);
+    if (!existing) {
+      throw new Error("Product stock not found");
+    }
+    const updated: ProductStock = {
+      ...existing,
+      ...updates,
+    };
+    this.productStocks.set(id, updated);
+    return updated;
+  }
+
+  async deleteProductStock(id: number): Promise<void> {
+    this.productStocks.delete(id);
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -418,6 +469,40 @@ export class DbStorage implements IStorage {
 
   async deleteWorkshopOrder(id: number): Promise<void> {
     await db.delete(workshopOrders).where(eq(workshopOrders.id, id));
+  }
+
+  // Product Stock
+  async getAllProductStock(): Promise<ProductStock[]> {
+    return await db.select().from(productStock);
+  }
+
+  async getProductStockByProduct(productId: number): Promise<ProductStock[]> {
+    return await db.select().from(productStock).where(eq(productStock.productId, productId));
+  }
+
+  async getProductStock(id: number): Promise<ProductStock | undefined> {
+    const result = await db.select().from(productStock).where(eq(productStock.id, id));
+    return result[0];
+  }
+
+  async createProductStock(insertStock: InsertProductStock & { createdBy: number }): Promise<ProductStock> {
+    const result = await db.insert(productStock).values(insertStock).returning();
+    return result[0];
+  }
+
+  async updateProductStockEntry(id: number, updates: Partial<InsertProductStock>): Promise<ProductStock> {
+    const result = await db.update(productStock)
+      .set(updates)
+      .where(eq(productStock.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error("Product stock not found");
+    }
+    return result[0];
+  }
+
+  async deleteProductStock(id: number): Promise<void> {
+    await db.delete(productStock).where(eq(productStock.id, id));
   }
 }
 

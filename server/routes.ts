@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema } from "@shared/schema";
+import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema, insertProductStockSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, ensureAuthenticated, hashPassword } from "./auth";
 
@@ -260,6 +260,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteWorkshopOrder(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Product Stock API
+  app.get("/api/product-stock", ensureAuthenticated, async (req, res) => {
+    try {
+      const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
+      
+      if (productId) {
+        const stocks = await storage.getProductStockByProduct(productId);
+        res.json(stocks);
+      } else {
+        const stocks = await storage.getAllProductStock();
+        res.json(stocks);
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const stock = await storage.getProductStock(id);
+      
+      if (!stock) {
+        return res.status(404).json({ message: "Product stock not found" });
+      }
+      
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/product-stock", ensureAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertProductStockSchema.parse(req.body);
+      
+      // Verify product exists
+      const product = await storage.getProduct(validatedData.productId as number);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Create the stock entry
+      const stock = await storage.createProductStock({
+        ...validatedData,
+        createdBy: req.user!.id,
+      });
+
+      // Update the product's total stock
+      const newTotalStock = product.stock + validatedData.quantity;
+      await storage.updateProductStock(validatedData.productId as number, newTotalStock, req.user!.id);
+
+      res.status(201).json(stock);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertProductStockSchema.partial().parse(req.body);
+      
+      // Prevent changing productId
+      if (validatedData.productId !== undefined) {
+        return res.status(400).json({ message: "Cannot change product ID of a stock entry" });
+      }
+
+      // Get the current stock entry
+      const currentStock = await storage.getProductStock(id);
+      if (!currentStock) {
+        return res.status(404).json({ message: "Product stock not found" });
+      }
+
+      // Get the product
+      const product = await storage.getProduct(currentStock.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // If quantity is changing, validate the new total would be non-negative
+      if (validatedData.quantity !== undefined && validatedData.quantity !== currentStock.quantity) {
+        const quantityDelta = validatedData.quantity - currentStock.quantity;
+        const newTotalStock = product.stock + quantityDelta;
+        
+        if (newTotalStock < 0) {
+          return res.status(400).json({ message: "Cannot reduce stock below zero" });
+        }
+        
+        // Update the stock entry first
+        const updatedStock = await storage.updateProductStockEntry(id, validatedData);
+        
+        // Then update the product's total stock
+        await storage.updateProductStock(currentStock.productId, newTotalStock, req.user!.id);
+        
+        res.json(updatedStock);
+      } else {
+        // No quantity change, just update other fields
+        const updatedStock = await storage.updateProductStockEntry(id, validatedData);
+        res.json(updatedStock);
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Get the stock entry before deleting
+      const stock = await storage.getProductStock(id);
+      if (!stock) {
+        return res.status(404).json({ message: "Product stock not found" });
+      }
+
+      // Get the product
+      const product = await storage.getProduct(stock.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Check if we can reduce stock
+      const newTotalStock = product.stock - stock.quantity;
+      if (newTotalStock < 0) {
+        return res.status(400).json({ message: "Cannot reduce stock below zero" });
+      }
+
+      // Delete the stock entry
+      await storage.deleteProductStock(id);
+
+      // Update the product's total stock
+      await storage.updateProductStock(stock.productId, newTotalStock, req.user!.id);
+
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
