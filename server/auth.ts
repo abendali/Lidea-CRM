@@ -1,27 +1,22 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    interface Request {
+      user?: SelectUser;
+    }
   }
 }
 
 const scryptAsync = promisify(scrypt);
 
-// Authentication middleware
-export function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).send("Unauthorized");
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-please-change-in-production';
+const JWT_COOKIE_NAME = 'auth_token';
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -36,44 +31,45 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-export function setupAuth(app: Express) {
-  const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-key-please-change-in-production';
+function generateToken(userId: number): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+function verifyToken(token: string): { userId: number } | null {
+  try {
+    return jwt.verify(token, JWT_SECRET) as { userId: number };
+  } catch {
+    return null;
+  }
+}
+
+export async function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
+  const token = req.cookies?.[JWT_COOKIE_NAME];
   
-  const sessionSettings: session.SessionOptions = {
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    },
-  };
+  if (!token) {
+    return res.status(401).send("Unauthorized");
+  }
 
+  const payload = verifyToken(token);
+  if (!payload) {
+    res.clearCookie(JWT_COOKIE_NAME);
+    return res.status(401).send("Unauthorized");
+  }
+
+  const user = await storage.getUser(payload.userId);
+  if (!user) {
+    res.clearCookie(JWT_COOKIE_NAME);
+    return res.status(401).send("Unauthorized");
+  }
+
+  req.user = user;
+  next();
+}
+
+export function setupAuth(app: Express) {
   app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
 
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
-      }
-    }),
-  );
-
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
-  });
-
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       
@@ -92,30 +88,55 @@ export function setupAuth(app: Express) {
         password: await hashPassword(validatedData.password),
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+      const token = generateToken(user.id);
+      res.cookie(JWT_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
       });
+
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
     } catch (error: any) {
       res.status(400).send(error.message || "Invalid registration data");
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    const { password, ...userWithoutPassword } = req.user!;
-    res.status(200).json(userWithoutPassword);
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).send("Username and password are required");
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user || !(await comparePasswords(password, user.password))) {
+        return res.status(401).send("Invalid credentials");
+      }
+
+      const token = generateToken(user.id);
+      res.cookie(JWT_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      });
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(500).send("Login failed");
+    }
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
+  app.post("/api/logout", (req, res) => {
+    res.clearCookie(JWT_COOKIE_NAME);
+    res.sendStatus(200);
   });
 
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.get("/api/user", ensureAuthenticated, (req, res) => {
     const { password, ...userWithoutPassword } = req.user!;
     res.json(userWithoutPassword);
   });
