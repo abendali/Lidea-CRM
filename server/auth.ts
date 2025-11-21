@@ -4,6 +4,7 @@ import { promisify } from "util";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
+import { getJwtSecret } from "./config";
 
 declare global {
   namespace Express {
@@ -14,12 +15,6 @@ declare global {
 }
 
 const scryptAsync = promisify(scrypt);
-
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable must be set");
-}
-
-const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_COOKIE_NAME = 'auth_token';
 
 export async function hashPassword(password: string) {
@@ -36,12 +31,12 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 function generateToken(userId: number): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, getJwtSecret(), { expiresIn: '7d' });
 }
 
 function verifyToken(token: string): { userId: number } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: number };
+    return jwt.verify(token, getJwtSecret()) as { userId: number };
   } catch {
     return null;
   }
