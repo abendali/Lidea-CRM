@@ -1,4 +1,4 @@
-import { Home, Package, DollarSign, Settings, LogOut, ClipboardList, Search, FileText, Star, Users, CreditCard, Zap } from "lucide-react";
+import { Home, Package, DollarSign, Settings, LogOut, ClipboardList, Search } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -18,54 +18,26 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-supabase-auth";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 
-const mainItems = [
+const items = [
   {
     title: "Dashboard",
     url: "/",
     icon: Home,
   },
   {
-    title: "All pages",
-    url: "/inventory",
-    icon: FileText,
-  },
-  {
-    title: "Reports",
-    url: "/workshop-orders",
-    icon: ClipboardList,
-  },
-  {
-    title: "Products",
+    title: "Inventory",
     url: "/inventory",
     icon: Package,
   },
   {
-    title: "Task",
+    title: "Cashflow",
     url: "/cashflow",
     icon: DollarSign,
   },
-];
-
-const featuresItems = [
   {
-    title: "Features",
-    url: "/settings",
-    icon: Star,
-  },
-  {
-    title: "Users",
-    url: "/settings",
-    icon: Users,
-  },
-  {
-    title: "Pricing",
-    url: "/settings",
-    icon: CreditCard,
-  },
-  {
-    title: "Integrations",
-    url: "/settings",
-    icon: Zap,
+    title: "Workshop Orders",
+    url: "/workshop-orders",
+    icon: ClipboardList,
   },
 ];
 
@@ -103,24 +75,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase()}`}>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {featuresItems.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase()}`}>
                     <Link href={item.url}>
@@ -165,13 +120,14 @@ export function AppSidebar() {
           </div>
         )}
         <Button 
-          variant="destructive" 
+          variant="outline" 
           className="w-full" 
           onClick={handleLogout}
           disabled={logoutMutation.isPending}
           data-testid="button-logout"
         >
-          {logoutMutation.isPending ? "Logging out..." : "Get template"}
+          <LogOut className="h-4 w-4 mr-2" />
+          {logoutMutation.isPending ? "Logging out..." : "Logout"}
         </Button>
       </SidebarFooter>
     </Sidebar>
