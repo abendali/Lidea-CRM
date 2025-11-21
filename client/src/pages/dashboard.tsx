@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-supabase-auth";
 
 interface DashboardStats {
   totalProducts: number;
@@ -33,6 +34,7 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isWorkshopDialogOpen, setIsWorkshopDialogOpen] = useState(false);
   const [workshopFormData, setWorkshopFormData] = useState({
     productId: '',
@@ -191,39 +193,94 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold" data-testid="text-page-title">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Overview of your store's performance
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            Welcome back, {user?.name || user?.username || 'User'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Measure your advertising ROI and report website traffic.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" data-testid="button-export">
+            Export data
+          </Button>
+          <Button variant="destructive" size="sm" data-testid="button-create-report">
+            Create report
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Products"
-          value={stats?.totalProducts || 0}
-          icon={Package}
-          testId="card-total-products"
-        />
-        <MetricCard
-          title="Stock Value"
-          value={formatCurrency(stats?.totalStockValue || 0)}
-          icon={TrendingUp}
-          testId="card-stock-value"
-        />
-        <MetricCard
-          title="Cash Balance"
-          value={formatCurrency(stats?.currentCapital || 0)}
-          icon={DollarSign}
-          testId="card-cash-balance"
-        />
-        <MetricCard
-          title="Low Stock Items"
-          value={stats?.lowStockCount || 0}
-          icon={AlertCircle}
-          testId="card-low-stock"
-        />
+        <Card className="relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pageviews</CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <span className="text-xs">•••</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold tabular-nums">{(stats?.totalProducts || 0) * 10}K</div>
+              <Badge variant="outline" className="text-xs bg-chart-2/10 text-chart-2 border-chart-2/20">
+                28.1%
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Monthly users</CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <span className="text-xs">•••</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold tabular-nums">{(stats?.totalProducts || 0) * 4}K</div>
+              <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/20">
+                -8%
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">New sign ups</CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <span className="text-xs">•••</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold tabular-nums">{stats?.lowStockCount || 0}</div>
+              <Badge variant="outline" className="text-xs bg-chart-2/10 text-chart-2 border-chart-2/20">
+                3.0%
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Subscriptions</CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <span className="text-xs">•••</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold tabular-nums">2.3K</div>
+              <Badge variant="outline" className="text-xs bg-chart-2/10 text-chart-2 border-chart-2/20">
+                11.3%
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
