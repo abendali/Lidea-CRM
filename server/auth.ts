@@ -1,14 +1,10 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser, insertUserSchema } from "@shared/schema";
-import { RedisStore } from "connect-redis";
-import { createClient } from "redis";
-import memorystore from "memorystore";
+import { User as SelectUser, insertUserSchema, type InsertUser } from "@shared/schema";
+import jwt from "jsonwebtoken";
+import cookie from "cookie";
 
 declare global {
   namespace Express {
@@ -17,6 +13,9 @@ declare global {
 }
 
 const scryptAsync = promisify(scrypt);
+
+// JWT secret - use environment variable or fallback
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-please-change-in-production';
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -31,73 +30,37 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-export function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
+interface AuthRequest extends Request {
+  user?: SelectUser;
+}
+
+// JWT authentication middleware
+export function ensureAuthenticated(req: AuthRequest, res: Response, next: NextFunction) {
+  const cookies = cookie.parse(req.headers.cookie || '');
+  const token = cookies.auth_token || req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).send("Unauthorized");
   }
-  res.status(401).send("Unauthorized");
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    storage.getUser(decoded.userId).then(user => {
+      if (!user) {
+        return res.status(401).send("Unauthorized");
+      }
+      req.user = user;
+      next();
+    }).catch(() => {
+      res.status(401).send("Unauthorized");
+    });
+  } catch (err) {
+    res.status(401).send("Unauthorized");
+  }
 }
 
 export async function setupAuth(app: Express) {
-  const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-key-change-in-production';
-  
-  let sessionStore: session.SessionStore;
-
-  // Use Redis if REDIS_URL is available (Vercel/production)
-  if (process.env.REDIS_URL) {
-    try {
-      const redisClient = createClient({ url: process.env.REDIS_URL });
-      await redisClient.connect().catch(() => {
-        console.warn("Could not connect to Redis, falling back to memory store");
-      });
-      
-      sessionStore = new RedisStore({ client: redisClient });
-    } catch (err) {
-      console.warn("Redis connection failed, using memory store");
-      const MemoryStore = memorystore(session);
-      sessionStore = new MemoryStore({ checkPeriod: 86400000 });
-    }
-  } else {
-    // Development: use in-memory store
-    const MemoryStore = memorystore(session);
-    sessionStore = new MemoryStore({ checkPeriod: 86400000 });
-  }
-
-  const sessionSettings: session.SessionOptions = {
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    store: sessionStore,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    },
-  };
-
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
-      }
-    })
-  );
-
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
-  });
-
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       
@@ -116,30 +79,67 @@ export async function setupAuth(app: Express) {
         password: await hashPassword(validatedData.password),
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
-      });
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      
+      res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/'
+      }));
+
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
     } catch (error: any) {
+      console.error('Register error:', error);
       res.status(400).send(error.message || "Invalid registration data");
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    const { password, ...userWithoutPassword } = req.user!;
-    res.status(200).json(userWithoutPassword);
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).send("Username and password required");
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user || !(await comparePasswords(password, user.password))) {
+        return res.status(401).send("Invalid credentials");
+      }
+
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      
+      res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/'
+      }));
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(500).send("Login failed");
+    }
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
+  app.post("/api/logout", (req, res) => {
+    res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/'
+    }));
+    res.sendStatus(200);
   });
 
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.get("/api/user", ensureAuthenticated, (req: AuthRequest, res) => {
     const { password, ...userWithoutPassword } = req.user!;
     res.json(userWithoutPassword);
   });
