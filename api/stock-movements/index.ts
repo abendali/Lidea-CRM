@@ -29,16 +29,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     try {
-      const validatedData = insertStockMovementSchema.parse(req.body);
+      const validatedData = insertStockMovementSchema.parse(req.body) as any;
       
-      const product = await storage.getProduct(validatedData.productId as number);
+      const product = await storage.getProduct(validatedData.productId);
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
 
       let newStock = product.stock;
-      const movementType = validatedData.type as 'add' | 'subtract';
-      const quantity = validatedData.quantity as number;
+      const movementType = validatedData.type;
+      const quantity = validatedData.quantity;
       
       if (movementType === 'add') {
         newStock += quantity;
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...validatedData,
         createdBy: user.userId,
       });
-      await storage.updateProductStock(validatedData.productId as number, newStock, user.userId);
+      await storage.updateProductStock(validatedData.productId, newStock, user.userId);
 
       return res.status(201).json(movement);
     } catch (error: any) {

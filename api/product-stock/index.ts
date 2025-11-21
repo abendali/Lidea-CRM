@@ -29,9 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     try {
-      const validatedData = insertProductStockSchema.parse(req.body);
+      const validatedData = insertProductStockSchema.parse(req.body) as any;
       
-      const product = await storage.getProduct(validatedData.productId as number);
+      const product = await storage.getProduct(validatedData.productId);
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       const newTotalStock = product.stock + validatedData.quantity;
-      await storage.updateProductStock(validatedData.productId as number, newTotalStock, user.userId);
+      await storage.updateProductStock(validatedData.productId, newTotalStock, user.userId);
 
       return res.status(201).json(stock);
     } catch (error: any) {

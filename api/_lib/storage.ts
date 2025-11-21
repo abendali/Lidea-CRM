@@ -38,7 +38,7 @@ export async function getProduct(id: number): Promise<Product | undefined> {
 
 export async function createProduct(insertProduct: InsertProduct & { createdBy: number }): Promise<Product> {
   const db = getDb();
-  const result = await db.insert(products).values(insertProduct).returning();
+  const result = await db.insert(products).values(insertProduct as any).returning();
   return result[0];
 }
 
@@ -66,7 +66,7 @@ export async function getStockMovementsByProduct(productId: number): Promise<Sto
 
 export async function createStockMovement(movement: InsertStockMovement & { createdBy: number }): Promise<StockMovement> {
   const db = getDb();
-  const result = await db.insert(stockMovements).values(movement).returning();
+  const result = await db.insert(stockMovements).values(movement as any).returning();
   return result[0];
 }
 
@@ -84,7 +84,7 @@ export async function getCashflow(id: number): Promise<Cashflow | undefined> {
 
 export async function createCashflow(insertCashflow: InsertCashflow & { createdBy: number }): Promise<Cashflow> {
   const db = getDb();
-  const result = await db.insert(cashflows).values(insertCashflow).returning();
+  const result = await db.insert(cashflows).values(insertCashflow as any).returning();
   return result[0];
 }
 
@@ -134,7 +134,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 
 export async function createUser(insertUser: InsertUser): Promise<User> {
   const db = getDb();
-  const result = await db.insert(users).values(insertUser).returning();
+  const result = await db.insert(users).values(insertUser as any).returning();
   return result[0];
 }
 
@@ -161,7 +161,7 @@ export async function getWorkshopOrder(id: number): Promise<WorkshopOrder | unde
 
 export async function createWorkshopOrder(insertOrder: InsertWorkshopOrder & { createdBy: number }): Promise<WorkshopOrder> {
   const db = getDb();
-  const result = await db.insert(workshopOrders).values(insertOrder).returning();
+  const result = await db.insert(workshopOrders).values(insertOrder as any).returning();
   return result[0];
 }
 
@@ -201,7 +201,7 @@ export async function getProductStock(id: number): Promise<ProductStock | undefi
 
 export async function createProductStock(insertStock: InsertProductStock & { createdBy: number }): Promise<ProductStock> {
   const db = getDb();
-  const result = await db.insert(productStock).values(insertStock).returning();
+  const result = await db.insert(productStock).values(insertStock as any).returning();
   return result[0];
 }
 

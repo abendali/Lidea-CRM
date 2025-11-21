@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const validatedData = insertUserSchema.parse(req.body);
+    const validatedData = insertUserSchema.parse(req.body) as any;
     
     const existingUser = await storage.getUserByUsername(validatedData.username);
     if (existingUser) {
