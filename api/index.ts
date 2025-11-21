@@ -1,14 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { createServer } from "http";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from "../shared/schema";
-import pkg from 'pg';
 import { eq, desc } from "drizzle-orm";
 import { 
   products, 
@@ -28,10 +23,8 @@ import {
   insertUserSchema
 } from "../shared/schema";
 import { z } from "zod";
-import createMemoryStore from "memorystore";
-import ConnectPgSimple from "connect-pg-simple";
-
-const { Pool } = pkg;
+import jwt from "jsonwebtoken";
+import cookie from "cookie";
 
 // Database setup
 if (!process.env.DATABASE_URL) {
@@ -42,22 +35,12 @@ if (!process.env.DATABASE_URL) {
 
 const client = postgres(process.env.DATABASE_URL);
 const db = drizzle(client, { schema });
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const MemoryStore = createMemoryStore(session);
-const PgSession = ConnectPgSimple(session);
+// JWT secret - use environment variable or fallback
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-please-change-in-production';
 
 // Storage setup
 class DbStorage {
-  sessionStore: session.SessionStore;
-
-  constructor() {
-    this.sessionStore = new (PgSession)(session)({
-      pool,
-      createTableIfMissing: true,
-    });
-  }
-
   async getAllProducts() {
     return db.select().from(products).orderBy(desc(products.id));
   }
@@ -219,11 +202,33 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
+interface AuthRequest extends Request {
+  user?: SelectUser;
+}
+
+// JWT authentication middleware
+function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  const cookies = cookie.parse(req.headers.cookie || '');
+  const token = cookies.auth_token || req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).send("Unauthorized");
   }
-  res.status(401).send("Unauthorized");
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    storage.getUser(decoded.userId).then(user => {
+      if (!user) {
+        return res.status(401).send("Unauthorized");
+      }
+      req.user = user;
+      next();
+    }).catch(() => {
+      res.status(401).send("Unauthorized");
+    });
+  } catch (err) {
+    res.status(401).send("Unauthorized");
+  }
 }
 
 async function hashPassword(password: string) {
@@ -289,45 +294,8 @@ let isInitialized = false;
 
 async function initializeApp() {
   if (!isInitialized) {
-    // Setup authentication
-    const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-key-please-change-in-production';
-    
-    const sessionSettings: session.SessionOptions = {
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      store: storage.sessionStore,
-      cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-      },
-    };
-
-    app.set("trust proxy", 1);
-    app.use(session(sessionSettings));
-    app.use(passport.initialize());
-    app.use(passport.session());
-
-    passport.use(
-      new LocalStrategy(async (username, password, done) => {
-        const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
-        } else {
-          return done(null, user);
-        }
-      }),
-    );
-
-    passport.serializeUser((user, done) => done(null, user.id));
-    passport.deserializeUser(async (id: number, done) => {
-      const user = await storage.getUser(id);
-      done(null, user);
-    });
-
     // Auth routes
-    app.post("/api/register", async (req, res, next) => {
+    app.post("/api/register", async (req, res) => {
       try {
         const validatedData = insertUserSchema.parse(req.body);
         
@@ -346,45 +314,83 @@ async function initializeApp() {
           password: await hashPassword(validatedData.password),
         });
 
-        req.login(user, (err) => {
-          if (err) return next(err);
-          const { password, ...userWithoutPassword } = user;
-          res.status(201).json(userWithoutPassword);
-        });
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        
+        res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+          path: '/'
+        }));
+
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
       } catch (error: any) {
+        console.error('Register error:', error);
         res.status(400).send(error.message || "Invalid registration data");
       }
     });
 
-    app.post("/api/login", passport.authenticate("local"), (req, res) => {
-      const { password, ...userWithoutPassword } = req.user!;
-      res.status(200).json(userWithoutPassword);
+    app.post("/api/login", async (req, res) => {
+      try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+          return res.status(400).send("Username and password required");
+        }
+
+        const user = await storage.getUserByUsername(username);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return res.status(401).send("Invalid credentials");
+        }
+
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        
+        res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+          path: '/'
+        }));
+
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(200).json(userWithoutPassword);
+      } catch (error: any) {
+        console.error('Login error:', error);
+        res.status(500).send("Login failed");
+      }
     });
 
-    app.post("/api/logout", (req, res, next) => {
-      req.logout((err) => {
-        if (err) return next(err);
-        res.sendStatus(200);
-      });
+    app.post("/api/logout", (req, res) => {
+      res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 0,
+        path: '/'
+      }));
+      res.sendStatus(200);
     });
 
-    app.get("/api/user", (req, res) => {
-      if (!req.isAuthenticated()) return res.sendStatus(401);
+    app.get("/api/user", authenticateToken, (req: AuthRequest, res) => {
       const { password, ...userWithoutPassword } = req.user!;
       res.json(userWithoutPassword);
     });
 
     // Products API
-    app.get("/api/products", ensureAuthenticated, async (req, res) => {
+    app.get("/api/products", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const productsData = await storage.getAllProducts();
         res.json(productsData);
       } catch (error: any) {
+        console.error('Get products error:', error);
         res.status(500).json({ message: error.message });
       }
     });
 
-    app.get("/api/products/:id", ensureAuthenticated, async (req, res) => {
+    app.get("/api/products/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         const product = await storage.getProduct(id);
@@ -399,7 +405,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/products", ensureAuthenticated, async (req, res) => {
+    app.post("/api/products", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const validatedData = insertProductSchema.parse(req.body);
         const product = await storage.createProduct({
@@ -415,7 +421,7 @@ async function initializeApp() {
       }
     });
 
-    app.delete("/api/products/:id", ensureAuthenticated, async (req, res) => {
+    app.delete("/api/products/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         await storage.deleteProduct(id);
@@ -426,7 +432,7 @@ async function initializeApp() {
     });
 
     // Stock Movements API
-    app.get("/api/stock-movements", ensureAuthenticated, async (req, res) => {
+    app.get("/api/stock-movements", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
         
@@ -442,7 +448,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/stock-movements", ensureAuthenticated, async (req, res) => {
+    app.post("/api/stock-movements", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const validatedData = insertStockMovementSchema.parse(req.body);
         
@@ -481,7 +487,7 @@ async function initializeApp() {
     });
 
     // Cashflow API
-    app.get("/api/cashflows", ensureAuthenticated, async (req, res) => {
+    app.get("/api/cashflows", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const cashflowsData = await storage.getAllCashflows();
         res.json(cashflowsData);
@@ -490,7 +496,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/cashflows", ensureAuthenticated, async (req, res) => {
+    app.post("/api/cashflows", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const validatedData = insertCashflowSchema.parse(req.body);
         const cashflow = await storage.createCashflow({
@@ -507,7 +513,7 @@ async function initializeApp() {
     });
 
     // User API
-    app.get("/api/users", ensureAuthenticated, async (req, res) => {
+    app.get("/api/users", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const usersData = await storage.getAllUsers();
         const usersWithoutPasswords = usersData.map(({ password, ...user }) => user);
@@ -517,7 +523,7 @@ async function initializeApp() {
       }
     });
 
-    app.patch("/api/users/:id", ensureAuthenticated, async (req, res) => {
+    app.patch("/api/users/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         
@@ -545,7 +551,7 @@ async function initializeApp() {
     });
 
     // Settings API
-    app.get("/api/settings/:key", ensureAuthenticated, async (req, res) => {
+    app.get("/api/settings/:key", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const setting = await storage.getSetting(req.params.key);
         
@@ -559,7 +565,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/settings", ensureAuthenticated, async (req, res) => {
+    app.post("/api/settings", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const { key, value } = req.body;
         
@@ -575,7 +581,7 @@ async function initializeApp() {
     });
 
     // Workshop Orders API
-    app.get("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+    app.get("/api/workshop-orders", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const orders = await storage.getAllWorkshopOrders();
         res.json(orders);
@@ -584,7 +590,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+    app.post("/api/workshop-orders", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const validatedData = insertWorkshopOrderSchema.parse(req.body);
         const order = await storage.createWorkshopOrder({
@@ -600,7 +606,7 @@ async function initializeApp() {
       }
     });
 
-    app.patch("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+    app.patch("/api/workshop-orders/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         const validatedData = insertWorkshopOrderSchema.partial().parse(req.body);
@@ -614,7 +620,7 @@ async function initializeApp() {
       }
     });
 
-    app.delete("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+    app.delete("/api/workshop-orders/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         await storage.deleteWorkshopOrder(id);
@@ -625,7 +631,7 @@ async function initializeApp() {
     });
 
     // Product Stock API
-    app.get("/api/product-stock", ensureAuthenticated, async (req, res) => {
+    app.get("/api/product-stock", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
         
@@ -641,7 +647,7 @@ async function initializeApp() {
       }
     });
 
-    app.get("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    app.get("/api/product-stock/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         const stock = await storage.getProductStock(id);
@@ -656,7 +662,7 @@ async function initializeApp() {
       }
     });
 
-    app.post("/api/product-stock", ensureAuthenticated, async (req, res) => {
+    app.post("/api/product-stock", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const validatedData = insertProductStockSchema.parse(req.body);
         
@@ -682,7 +688,7 @@ async function initializeApp() {
       }
     });
 
-    app.patch("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    app.patch("/api/product-stock/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         const validatedData = insertProductStockSchema.partial().parse(req.body);
@@ -725,7 +731,7 @@ async function initializeApp() {
       }
     });
 
-    app.delete("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+    app.delete("/api/product-stock/:id", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const id = parseInt(req.params.id);
         
@@ -754,7 +760,7 @@ async function initializeApp() {
     });
 
     // Dashboard stats endpoint
-    app.get("/api/dashboard/stats", ensureAuthenticated, async (req, res) => {
+    app.get("/api/dashboard/stats", authenticateToken, async (req: AuthRequest, res) => {
       try {
         const productsData = await storage.getAllProducts();
         const cashflowsData = await storage.getAllCashflows();
@@ -804,6 +810,11 @@ async function initializeApp() {
 }
 
 export default async function handler(req: any, res: any) {
-  await initializeApp();
-  return app(req, res);
+  try {
+    await initializeApp();
+    return app(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 }
