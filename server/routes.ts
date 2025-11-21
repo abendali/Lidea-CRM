@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema, insertProductStockSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, ensureAuthenticated, hashPassword } from "./auth";
+import { setupAuth, ensureAuthenticated } from "./supabase-auth";
+import { hashPassword } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
