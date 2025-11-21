@@ -1,5 +1,5 @@
 import { Express, Request, Response, NextFunction } from "express";
-import { supabase } from "./supabase";
+import { supabase, isSupabaseConfigured } from "./supabase";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
@@ -38,6 +38,10 @@ export function ensureAuthenticated(req: AuthRequest, res: Response, next: NextF
 
 export async function setupAuth(app: Express) {
   app.post("/api/auth/register", async (req, res) => {
+    if (!isSupabaseConfigured) {
+      return res.status(503).send("Authentication service not configured. Please contact administrator.");
+    }
+    
     try {
       const { email, password, username, name } = req.body;
 
@@ -87,6 +91,10 @@ export async function setupAuth(app: Express) {
   });
 
   app.post("/api/auth/login", async (req, res) => {
+    if (!isSupabaseConfigured) {
+      return res.status(503).send("Authentication service not configured. Please contact administrator.");
+    }
+    
     try {
       const { email, password } = req.body;
 
