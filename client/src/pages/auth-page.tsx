@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Redirect } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,12 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 import warehouseUrl from "@assets/image_1762252583003.png";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [loginData, setLoginData] = useState({ username: "", password: "" });
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ username: "", email: "", password: "", name: "" });
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -34,12 +35,21 @@ export default function AuthPage() {
     registerMutation.mutate(registerData);
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Password Reset Link Sent",
-      description: `If an account exists with ${resetEmail}, you will receive a password reset link.`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail);
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Password Reset Link Sent",
+        description: `If an account exists with ${resetEmail}, you will receive a password reset link.`,
+      });
+    }
     setResetEmail("");
     setForgotPasswordOpen(false);
   };
@@ -63,15 +73,15 @@ export default function AuthPage() {
                 <CardContent>
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-username">Username</Label>
+                      <Label htmlFor="login-email">Email</Label>
                       <Input
-                        id="login-username"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={loginData.username}
-                        onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+                        id="login-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={loginData.email}
+                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                         required
-                        data-testid="input-login-username"
+                        data-testid="input-login-email"
                       />
                     </div>
                     <div className="space-y-2">
