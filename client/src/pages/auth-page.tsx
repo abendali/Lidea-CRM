@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Store } from "lucide-react";
+import { Store, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 import warehouseUrl from "@assets/image_1762252583003.png";
 
@@ -58,6 +59,15 @@ export default function AuthPage() {
     <div className="flex min-h-screen">
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-md">
+          {!isSupabaseConfigured && (
+            <Alert variant="destructive" className="mb-4" data-testid="alert-supabase-missing">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Configuration Required</AlertTitle>
+              <AlertDescription>
+                Supabase credentials are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables in your deployment settings.
+              </AlertDescription>
+            </Alert>
+          )}
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>

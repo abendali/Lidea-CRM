@@ -40,10 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsInitialized(true);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setIsInitialized(true);
+      })
+      .catch((error) => {
+        console.error('Error getting session:', error);
+        setIsInitialized(true);
+      });
 
     const {
       data: { subscription },
