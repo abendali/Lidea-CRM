@@ -1,6 +1,245 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
+import { createServer } from "http";
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import session from "express-session";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import * as schema from "../shared/schema";
+import pkg from 'pg';
+import { eq, desc } from "drizzle-orm";
+import { 
+  products, 
+  stockMovements, 
+  cashflows, 
+  settings, 
+  users, 
+  workshopOrders, 
+  productStock,
+  insertProductSchema, 
+  insertStockMovementSchema, 
+  insertCashflowSchema, 
+  insertWorkshopOrderSchema, 
+  updateUserSchema, 
+  insertProductStockSchema,
+  type User as SelectUser,
+  insertUserSchema
+} from "../shared/schema";
+import { z } from "zod";
+import createMemoryStore from "memorystore";
+import ConnectPgSimple from "connect-pg-simple";
 
+const { Pool } = pkg;
+
+// Database setup
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to provision a database?",
+  );
+}
+
+const client = postgres(process.env.DATABASE_URL);
+const db = drizzle(client, { schema });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const MemoryStore = createMemoryStore(session);
+const PgSession = ConnectPgSimple(session);
+
+// Storage setup
+class DbStorage {
+  sessionStore: session.SessionStore;
+
+  constructor() {
+    this.sessionStore = new (PgSession)(session)({
+      pool,
+      createTableIfMissing: true,
+    });
+  }
+
+  async getAllProducts() {
+    return db.select().from(products).orderBy(desc(products.id));
+  }
+
+  async getProduct(id: number) {
+    const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createProduct(product: any) {
+    const result = await db.insert(products).values(product).returning();
+    return result[0];
+  }
+
+  async deleteProduct(id: number) {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
+  async updateProductStock(id: number, newStock: number, modifiedBy: number) {
+    const result = await db
+      .update(products)
+      .set({ stock: newStock, modifiedBy })
+      .where(eq(products.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAllStockMovements() {
+    return db.select().from(stockMovements).orderBy(desc(stockMovements.id));
+  }
+
+  async getStockMovementsByProduct(productId: number) {
+    return db.select().from(stockMovements).where(eq(stockMovements.productId, productId)).orderBy(desc(stockMovements.id));
+  }
+
+  async createStockMovement(movement: any) {
+    const result = await db.insert(stockMovements).values(movement).returning();
+    return result[0];
+  }
+
+  async getAllCashflows() {
+    return db.select().from(cashflows).orderBy(desc(cashflows.id));
+  }
+
+  async getCashflow(id: number) {
+    const result = await db.select().from(cashflows).where(eq(cashflows.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCashflow(cashflow: any) {
+    const result = await db.insert(cashflows).values(cashflow).returning();
+    return result[0];
+  }
+
+  async getSetting(key: string) {
+    const result = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    return result[0];
+  }
+
+  async setSetting(key: string, value: string) {
+    const existing = await this.getSetting(key);
+    if (existing) {
+      const result = await db.update(settings).set({ value }).where(eq(settings.key, key)).returning();
+      return result[0];
+    } else {
+      const result = await db.insert(settings).values({ key, value }).returning();
+      return result[0];
+    }
+  }
+
+  async getAllUsers() {
+    return db.select().from(users).orderBy(desc(users.id));
+  }
+
+  async getUser(id: number) {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string) {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string) {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async createUser(user: any) {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
+  }
+
+  async updateUser(id: number, updates: any) {
+    const result = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return result[0];
+  }
+
+  async getAllWorkshopOrders() {
+    return db.select().from(workshopOrders).orderBy(desc(workshopOrders.id));
+  }
+
+  async getWorkshopOrder(id: number) {
+    const result = await db.select().from(workshopOrders).where(eq(workshopOrders.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createWorkshopOrder(order: any) {
+    const result = await db.insert(workshopOrders).values(order).returning();
+    return result[0];
+  }
+
+  async updateWorkshopOrder(id: number, order: any) {
+    const result = await db.update(workshopOrders).set(order).where(eq(workshopOrders.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteWorkshopOrder(id: number) {
+    await db.delete(workshopOrders).where(eq(workshopOrders.id, id));
+  }
+
+  async getAllProductStock() {
+    return db.select().from(productStock).orderBy(desc(productStock.id));
+  }
+
+  async getProductStockByProduct(productId: number) {
+    return db.select().from(productStock).where(eq(productStock.productId, productId)).orderBy(desc(productStock.id));
+  }
+
+  async getProductStock(id: number) {
+    const result = await db.select().from(productStock).where(eq(productStock.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createProductStock(stock: any) {
+    const result = await db.insert(productStock).values(stock).returning();
+    return result[0];
+  }
+
+  async updateProductStockEntry(id: number, stock: any) {
+    const result = await db.update(productStock).set(stock).where(eq(productStock.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteProductStock(id: number) {
+    await db.delete(productStock).where(eq(productStock.id, id));
+  }
+}
+
+const storage = new DbStorage();
+
+// Auth utilities
+declare global {
+  namespace Express {
+    interface User extends SelectUser {}
+  }
+}
+
+const scryptAsync = promisify(scrypt);
+
+function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).send("Unauthorized");
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
+
+async function comparePasswords(supplied: string, stored: string) {
+  const [hashed, salt] = stored.split(".");
+  const hashedBuf = Buffer.from(hashed, "hex");
+  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+// Express app setup
 const app = express();
 
 declare module 'http' {
@@ -50,7 +289,507 @@ let isInitialized = false;
 
 async function initializeApp() {
   if (!isInitialized) {
-    await registerRoutes(app);
+    // Setup authentication
+    const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-key-please-change-in-production';
+    
+    const sessionSettings: session.SessionOptions = {
+      secret: sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      store: storage.sessionStore,
+      cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      },
+    };
+
+    app.set("trust proxy", 1);
+    app.use(session(sessionSettings));
+    app.use(passport.initialize());
+    app.use(passport.session());
+
+    passport.use(
+      new LocalStrategy(async (username, password, done) => {
+        const user = await storage.getUserByUsername(username);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        } else {
+          return done(null, user);
+        }
+      }),
+    );
+
+    passport.serializeUser((user, done) => done(null, user.id));
+    passport.deserializeUser(async (id: number, done) => {
+      const user = await storage.getUser(id);
+      done(null, user);
+    });
+
+    // Auth routes
+    app.post("/api/register", async (req, res, next) => {
+      try {
+        const validatedData = insertUserSchema.parse(req.body);
+        
+        const existingUser = await storage.getUserByUsername(validatedData.username);
+        if (existingUser) {
+          return res.status(400).send("Username already exists");
+        }
+
+        const existingEmail = await storage.getUserByEmail(validatedData.email);
+        if (existingEmail) {
+          return res.status(400).send("Email already exists");
+        }
+
+        const user = await storage.createUser({
+          ...validatedData,
+          password: await hashPassword(validatedData.password),
+        });
+
+        req.login(user, (err) => {
+          if (err) return next(err);
+          const { password, ...userWithoutPassword } = user;
+          res.status(201).json(userWithoutPassword);
+        });
+      } catch (error: any) {
+        res.status(400).send(error.message || "Invalid registration data");
+      }
+    });
+
+    app.post("/api/login", passport.authenticate("local"), (req, res) => {
+      const { password, ...userWithoutPassword } = req.user!;
+      res.status(200).json(userWithoutPassword);
+    });
+
+    app.post("/api/logout", (req, res, next) => {
+      req.logout((err) => {
+        if (err) return next(err);
+        res.sendStatus(200);
+      });
+    });
+
+    app.get("/api/user", (req, res) => {
+      if (!req.isAuthenticated()) return res.sendStatus(401);
+      const { password, ...userWithoutPassword } = req.user!;
+      res.json(userWithoutPassword);
+    });
+
+    // Products API
+    app.get("/api/products", ensureAuthenticated, async (req, res) => {
+      try {
+        const productsData = await storage.getAllProducts();
+        res.json(productsData);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.get("/api/products/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const product = await storage.getProduct(id);
+        
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+        
+        res.json(product);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/products", ensureAuthenticated, async (req, res) => {
+      try {
+        const validatedData = insertProductSchema.parse(req.body);
+        const product = await storage.createProduct({
+          ...validatedData,
+          createdBy: req.user!.id,
+        });
+        res.status(201).json(product);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.delete("/api/products/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        await storage.deleteProduct(id);
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Stock Movements API
+    app.get("/api/stock-movements", ensureAuthenticated, async (req, res) => {
+      try {
+        const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
+        
+        if (productId) {
+          const movements = await storage.getStockMovementsByProduct(productId);
+          res.json(movements);
+        } else {
+          const movements = await storage.getAllStockMovements();
+          res.json(movements);
+        }
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/stock-movements", ensureAuthenticated, async (req, res) => {
+      try {
+        const validatedData = insertStockMovementSchema.parse(req.body);
+        
+        const product = await storage.getProduct(validatedData.productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        let newStock = product.stock;
+        const movementType = validatedData.type;
+        const quantity = validatedData.quantity;
+        
+        if (movementType === 'add') {
+          newStock += quantity;
+        } else {
+          newStock -= quantity;
+        }
+
+        if (newStock < 0) {
+          return res.status(400).json({ message: "Insufficient stock" });
+        }
+
+        const movement = await storage.createStockMovement({
+          ...validatedData,
+          createdBy: req.user!.id,
+        });
+        await storage.updateProductStock(validatedData.productId, newStock, req.user!.id);
+
+        res.status(201).json(movement);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Cashflow API
+    app.get("/api/cashflows", ensureAuthenticated, async (req, res) => {
+      try {
+        const cashflowsData = await storage.getAllCashflows();
+        res.json(cashflowsData);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/cashflows", ensureAuthenticated, async (req, res) => {
+      try {
+        const validatedData = insertCashflowSchema.parse(req.body);
+        const cashflow = await storage.createCashflow({
+          ...validatedData,
+          createdBy: req.user!.id,
+        });
+        res.status(201).json(cashflow);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // User API
+    app.get("/api/users", ensureAuthenticated, async (req, res) => {
+      try {
+        const usersData = await storage.getAllUsers();
+        const usersWithoutPasswords = usersData.map(({ password, ...user }) => user);
+        res.json(usersWithoutPasswords);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.patch("/api/users/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        
+        if (id !== req.user!.id) {
+          return res.status(403).json({ message: "You can only update your own profile" });
+        }
+        
+        const validatedData = updateUserSchema.parse(req.body);
+        
+        const updates = { ...validatedData };
+        if (updates.password) {
+          updates.password = await hashPassword(updates.password);
+        }
+        
+        const user = await storage.updateUser(id, updates);
+        
+        const { password, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Settings API
+    app.get("/api/settings/:key", ensureAuthenticated, async (req, res) => {
+      try {
+        const setting = await storage.getSetting(req.params.key);
+        
+        if (!setting) {
+          return res.status(404).json({ message: "Setting not found" });
+        }
+        
+        res.json(setting);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/settings", ensureAuthenticated, async (req, res) => {
+      try {
+        const { key, value } = req.body;
+        
+        if (!key || value === undefined) {
+          return res.status(400).json({ message: "Key and value are required" });
+        }
+        
+        const setting = await storage.setSetting(key, value);
+        res.json(setting);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Workshop Orders API
+    app.get("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+      try {
+        const orders = await storage.getAllWorkshopOrders();
+        res.json(orders);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/workshop-orders", ensureAuthenticated, async (req, res) => {
+      try {
+        const validatedData = insertWorkshopOrderSchema.parse(req.body);
+        const order = await storage.createWorkshopOrder({
+          ...validatedData,
+          createdBy: req.user!.id,
+        });
+        res.status(201).json(order);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.patch("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const validatedData = insertWorkshopOrderSchema.partial().parse(req.body);
+        const order = await storage.updateWorkshopOrder(id, validatedData);
+        res.json(order);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.delete("/api/workshop-orders/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        await storage.deleteWorkshopOrder(id);
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Product Stock API
+    app.get("/api/product-stock", ensureAuthenticated, async (req, res) => {
+      try {
+        const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
+        
+        if (productId) {
+          const stocks = await storage.getProductStockByProduct(productId);
+          res.json(stocks);
+        } else {
+          const stocks = await storage.getAllProductStock();
+          res.json(stocks);
+        }
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.get("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const stock = await storage.getProductStock(id);
+        
+        if (!stock) {
+          return res.status(404).json({ message: "Product stock not found" });
+        }
+        
+        res.json(stock);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.post("/api/product-stock", ensureAuthenticated, async (req, res) => {
+      try {
+        const validatedData = insertProductStockSchema.parse(req.body);
+        
+        const product = await storage.getProduct(validatedData.productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        const stock = await storage.createProductStock({
+          ...validatedData,
+          createdBy: req.user!.id,
+        });
+
+        const newTotalStock = product.stock + validatedData.quantity;
+        await storage.updateProductStock(validatedData.productId, newTotalStock, req.user!.id);
+
+        res.status(201).json(stock);
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.patch("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const validatedData = insertProductStockSchema.partial().parse(req.body);
+        
+        if (validatedData.productId !== undefined) {
+          return res.status(400).json({ message: "Cannot change product ID of a stock entry" });
+        }
+
+        const currentStock = await storage.getProductStock(id);
+        if (!currentStock) {
+          return res.status(404).json({ message: "Product stock not found" });
+        }
+
+        const product = await storage.getProduct(currentStock.productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        if (validatedData.quantity !== undefined && validatedData.quantity !== currentStock.quantity) {
+          const quantityDelta = validatedData.quantity - currentStock.quantity;
+          const newTotalStock = product.stock + quantityDelta;
+          
+          if (newTotalStock < 0) {
+            return res.status(400).json({ message: "Cannot reduce stock below zero" });
+          }
+          
+          const updatedStock = await storage.updateProductStockEntry(id, validatedData);
+          await storage.updateProductStock(currentStock.productId, newTotalStock, req.user!.id);
+          
+          res.json(updatedStock);
+        } else {
+          const updatedStock = await storage.updateProductStockEntry(id, validatedData);
+          res.json(updatedStock);
+        }
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: error.errors });
+        }
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    app.delete("/api/product-stock/:id", ensureAuthenticated, async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        
+        const stock = await storage.getProductStock(id);
+        if (!stock) {
+          return res.status(404).json({ message: "Product stock not found" });
+        }
+
+        const product = await storage.getProduct(stock.productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        const newTotalStock = product.stock - stock.quantity;
+        if (newTotalStock < 0) {
+          return res.status(400).json({ message: "Cannot reduce stock below zero" });
+        }
+
+        await storage.deleteProductStock(id);
+        await storage.updateProductStock(stock.productId, newTotalStock, req.user!.id);
+
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
+    // Dashboard stats endpoint
+    app.get("/api/dashboard/stats", ensureAuthenticated, async (req, res) => {
+      try {
+        const productsData = await storage.getAllProducts();
+        const cashflowsData = await storage.getAllCashflows();
+        const initialCapitalSetting = await storage.getSetting('initial_capital');
+        
+        const totalProducts = productsData.length;
+        const totalStock = productsData.reduce((sum, p) => sum + p.stock, 0);
+        const totalStockValue = productsData.reduce((sum, p) => sum + (p.estimatedPrice * p.stock), 0);
+        const lowStockCount = productsData.filter(p => p.stock < 10).length;
+        
+        const totalIncome = cashflowsData
+          .filter(c => c.type === 'income')
+          .reduce((sum, c) => sum + c.amount, 0);
+        const totalExpense = cashflowsData
+          .filter(c => c.type === 'expense')
+          .reduce((sum, c) => sum + c.amount, 0);
+        const netBalance = totalIncome - totalExpense;
+        const initialCapital = initialCapitalSetting ? parseFloat(initialCapitalSetting.value) : 0;
+        const currentCapital = initialCapital + netBalance;
+        
+        res.json({
+          totalProducts,
+          totalStock,
+          totalStockValue,
+          lowStockCount,
+          totalIncome,
+          totalExpense,
+          netBalance,
+          initialCapital,
+          currentCapital,
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
