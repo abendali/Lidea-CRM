@@ -108,11 +108,18 @@ export async function setupAuth(app: Express) {
       });
 
       if (error) {
-        return res.status(401).send("Invalid credentials");
+        console.error('Supabase login error:', error);
+        return res.status(401).send(error.message || "Invalid credentials");
+      }
+
+      if (!data.session) {
+        console.error('No session returned from Supabase');
+        return res.status(401).send("Login failed - no session created");
       }
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        console.error('User not found in database:', email);
         return res.status(401).send("User not found");
       }
 
@@ -128,15 +135,7 @@ export async function setupAuth(app: Express) {
   });
 
   app.post("/api/auth/logout", async (req, res) => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        return res.status(500).send(error.message);
-      }
-      res.sendStatus(200);
-    } catch (error: any) {
-      res.status(500).send("Logout failed");
-    }
+    res.sendStatus(200);
   });
 
   app.get("/api/auth/user", ensureAuthenticated, (req: AuthRequest, res) => {

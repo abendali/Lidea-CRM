@@ -56,11 +56,8 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <span className="text-white font-bold text-sm">L</span>
-          </div>
-          <span className="font-semibold text-lg text-foreground" data-testid="text-logo">Lidea X</span>
+        <div className="flex items-center justify-center mb-4">
+          <img src={logoUrl} alt="Lidea" className="h-12" data-testid="img-logo" />
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -88,23 +85,8 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-settings">
-                  <Link href="/settings">
-                    <Settings />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 space-y-4">
+      <SidebarFooter className="p-4 space-y-3">
         {user && (
           <div className="flex items-center gap-3 p-2 rounded-lg hover-elevate" data-testid="user-profile">
             <Avatar className="h-8 w-8">
@@ -115,10 +97,16 @@ export function AppSidebar() {
             </Avatar>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium text-foreground truncate">{user.name || user.username}</p>
-              <p className="text-xs text-muted-foreground">Account settings</p>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
           </div>
         )}
+        <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-settings">
+          <Link href="/settings">
+            <Settings />
+            <span>Settings</span>
+          </Link>
+        </SidebarMenuButton>
         <Button 
           variant="outline" 
           className="w-full" 
