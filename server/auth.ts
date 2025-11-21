@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 import { RedisStore } from "connect-redis";
 import { createClient } from "redis";
+import memorystore from "memorystore";
 
 declare global {
   namespace Express {
@@ -53,12 +54,12 @@ export async function setupAuth(app: Express) {
       sessionStore = new RedisStore({ client: redisClient });
     } catch (err) {
       console.warn("Redis connection failed, using memory store");
-      const MemoryStore = require("memorystore")(session);
+      const MemoryStore = memorystore(session);
       sessionStore = new MemoryStore({ checkPeriod: 86400000 });
     }
   } else {
     // Development: use in-memory store
-    const MemoryStore = require("memorystore")(session);
+    const MemoryStore = memorystore(session);
     sessionStore = new MemoryStore({ checkPeriod: 86400000 });
   }
 
