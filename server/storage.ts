@@ -14,15 +14,9 @@ import {
   type ProductStock,
   type InsertProductStock
 } from "@shared/schema";
-import session from "express-session";
-import createMemoryStore from "memorystore";
-import { db, pool } from "./db";
+import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import { products, stockMovements, cashflows, settings, users, workshopOrders, productStock } from "@shared/schema";
-import ConnectPgSimple from "connect-pg-simple";
-
-const MemoryStore = createMemoryStore(session);
-const PgSession = ConnectPgSimple(session);
 
 export interface IStorage {
   // Products
@@ -68,9 +62,6 @@ export interface IStorage {
   createProductStock(stock: InsertProductStock & { createdBy: number }): Promise<ProductStock>;
   updateProductStockEntry(id: number, stock: Partial<InsertProductStock>): Promise<ProductStock>;
   deleteProductStock(id: number): Promise<void>;
-
-  // Session store
-  sessionStore: session.SessionStore;
 }
 
 export class MemStorage implements IStorage {
@@ -89,14 +80,6 @@ export class MemStorage implements IStorage {
   private userIdCounter = 1;
   private workshopOrderIdCounter = 1;
   private productStockIdCounter = 1;
-
-  sessionStore: session.SessionStore;
-
-  constructor() {
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
-    });
-  }
 
   // Products
   async getAllProducts(): Promise<Product[]> {
@@ -328,15 +311,6 @@ export class MemStorage implements IStorage {
 }
 
 export class DbStorage implements IStorage {
-  sessionStore: session.SessionStore;
-
-  constructor() {
-    this.sessionStore = new PgSession({
-      pool: pool,
-      createTableIfMissing: true,
-    });
-  }
-
   // Products
   async getAllProducts(): Promise<Product[]> {
     return await db.select().from(products);

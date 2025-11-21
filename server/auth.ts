@@ -15,7 +15,11 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-please-change-in-production';
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable must be set");
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_COOKIE_NAME = 'auth_token';
 
 export async function hashPassword(password: string) {

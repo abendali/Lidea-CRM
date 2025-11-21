@@ -52,3 +52,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "change-this-to-a-secure-random-value-in-production-fd9a8s7f6d5a4s3d2f1a0s9d8f7a6s5d4f3a2s1d0f9a8s7d6f5a4s3d2f1a0"
