@@ -74,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      queryClient.clear();
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       const data = await res.json();
       setSession(data.session);
@@ -82,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/auth/user"], data.user);
-      queryClient.invalidateQueries();
     },
     onError: (error: Error) => {
       console.error('Login error:', error);
@@ -103,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/auth/user"], data.user);
+      queryClient.invalidateQueries();
       toast({
         title: "Registration successful",
         description: "Welcome! Your account has been created.",
@@ -119,29 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch (error) {
-        console.error('Supabase logout error:', error);
-      }
-      try {
-        await apiRequest("POST", "/api/auth/logout");
-      } catch (error) {
-        console.error('Backend logout error:', error);
-      }
+      await supabase.auth.signOut();
     },
     onSuccess: () => {
       setSession(null);
       queryClient.clear();
     },
     onError: (error: Error) => {
+      console.error('Logout error:', error);
       setSession(null);
       queryClient.clear();
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
