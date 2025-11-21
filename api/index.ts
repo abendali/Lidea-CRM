@@ -25,6 +25,7 @@ import {
 import { z } from "zod";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
+import { createClient } from '@supabase/supabase-js';
 
 // Database setup
 if (!process.env.DATABASE_URL) {
@@ -44,6 +45,16 @@ const db = drizzle(client, { schema });
 
 // JWT secret - use environment variable or fallback
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-please-change-in-production';
+
+// Supabase setup
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const isSupabaseConfigured = supabaseUrl && supabaseAnonKey;
+
+const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key'
+);
 
 // Storage setup
 class DbStorage {
@@ -381,6 +392,143 @@ async function initializeApp() {
     });
 
     app.get("/api/user", authenticateToken, (req: AuthRequest, res) => {
+      const { password, ...userWithoutPassword } = req.user!;
+      res.json(userWithoutPassword);
+    });
+
+    // Supabase Auth routes (for /api/auth/* endpoints)
+    app.post("/api/auth/register", async (req, res) => {
+      if (!isSupabaseConfigured) {
+        return res.status(503).send("Authentication service not configured. Please contact administrator.");
+      }
+      
+      try {
+        const { email, password, username, name } = req.body;
+
+        if (!email || !password || !username) {
+          return res.status(400).send("Email, password, and username are required");
+        }
+
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser) {
+          return res.status(400).send("Username already exists");
+        }
+
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).send("Email already exists");
+        }
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (authError) {
+          return res.status(400).send(authError.message);
+        }
+
+        if (!authData.user) {
+          return res.status(400).send("Failed to create user");
+        }
+
+        const user = await storage.createUser({
+          username,
+          email,
+          password: '',
+          name: name || undefined,
+        });
+
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(201).json({
+          user: userWithoutPassword,
+          session: authData.session,
+        });
+      } catch (error: any) {
+        console.error('Register error:', error);
+        res.status(400).send(error.message || "Invalid registration data");
+      }
+    });
+
+    app.post("/api/auth/login", async (req, res) => {
+      if (!isSupabaseConfigured) {
+        return res.status(503).send("Authentication service not configured. Please contact administrator.");
+      }
+      
+      try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+          return res.status(400).send("Email and password required");
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          return res.status(401).send("Invalid credentials");
+        }
+
+        const user = await storage.getUserByEmail(email);
+        if (!user) {
+          return res.status(401).send("User not found");
+        }
+
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(200).json({
+          user: userWithoutPassword,
+          session: data.session,
+        });
+      } catch (error: any) {
+        console.error('Login error:', error);
+        res.status(500).send("Login failed");
+      }
+    });
+
+    app.post("/api/auth/logout", async (req, res) => {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          return res.status(500).send(error.message);
+        }
+        res.sendStatus(200);
+      } catch (error: any) {
+        res.status(500).send("Logout failed");
+      }
+    });
+
+    function ensureSupabaseAuth(req: AuthRequest, res: Response, next: NextFunction) {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).send("Unauthorized");
+      }
+
+      const token = authHeader.substring(7);
+
+      supabase.auth.getUser(token).then(async ({ data, error }) => {
+        if (error || !data.user) {
+          return res.status(401).send("Unauthorized");
+        }
+
+        try {
+          const user = await storage.getUserByEmail(data.user.email!);
+          if (!user) {
+            return res.status(401).send("User not found in database");
+          }
+          req.user = user;
+          next();
+        } catch (err) {
+          res.status(401).send("Unauthorized");
+        }
+      }).catch(() => {
+        res.status(401).send("Unauthorized");
+      });
+    }
+
+    app.get("/api/auth/user", ensureSupabaseAuth, (req: AuthRequest, res) => {
       const { password, ...userWithoutPassword } = req.user!;
       res.json(userWithoutPassword);
     });
