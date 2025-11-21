@@ -33,7 +33,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const client = postgres(process.env.DATABASE_URL);
+// Configure postgres client for serverless environment
+const client = postgres(process.env.DATABASE_URL, {
+  prepare: false, // Required for serverless environments
+  max: 1, // Limit connections in serverless
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 const db = drizzle(client, { schema });
 
 // JWT secret - use environment variable or fallback
@@ -318,8 +324,8 @@ async function initializeApp() {
         
         res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          secure: true,
+          sameSite: 'lax',
           maxAge: 60 * 60 * 24 * 7, // 7 days
           path: '/'
         }));
@@ -349,8 +355,8 @@ async function initializeApp() {
         
         res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          secure: true,
+          sameSite: 'lax',
           maxAge: 60 * 60 * 24 * 7, // 7 days
           path: '/'
         }));
@@ -366,8 +372,8 @@ async function initializeApp() {
     app.post("/api/logout", (req, res) => {
       res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: true,
+        sameSite: 'lax',
         maxAge: 0,
         path: '/'
       }));
