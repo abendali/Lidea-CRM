@@ -37,7 +37,47 @@ export function ensureAuthenticated(req: AuthRequest, res: Response, next: NextF
 }
 
 export async function setupAuth(app: Express) {
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/login", async (req, res) => {
+    if (!isSupabaseConfigured) {
+      return res.status(503).send("Authentication service not configured. Please contact administrator.");
+    }
+    
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).send("Username and password required");
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).send("Invalid credentials");
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      });
+
+      if (error) {
+        console.error('Supabase login error:', error);
+        return res.status(401).send("Invalid credentials");
+      }
+
+      if (!data.session) {
+        console.error('No session returned from Supabase');
+        return res.status(401).send("Login failed - no session created");
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(500).send("Login failed");
+    }
+  });
+
+  app.post("/api/register", async (req, res) => {
     if (!isSupabaseConfigured) {
       return res.status(503).send("Authentication service not configured. Please contact administrator.");
     }
@@ -80,10 +120,7 @@ export async function setupAuth(app: Express) {
       });
 
       const { password: _, ...userWithoutPassword } = user;
-      res.status(201).json({
-        user: userWithoutPassword,
-        session: authData.session,
-      });
+      res.status(201).json(userWithoutPassword);
     } catch (error: any) {
       console.error('Register error:', error);
       res.status(400).send(error.message || "Invalid registration data");
@@ -131,6 +168,34 @@ export async function setupAuth(app: Express) {
     } catch (error: any) {
       console.error('Login error:', error);
       res.status(500).send("Login failed");
+    }
+  });
+
+  app.post("/api/logout", async (req, res) => {
+    res.sendStatus(200);
+  });
+
+  app.get("/api/user", ensureAuthenticated, (req: AuthRequest, res) => {
+    const { password, ...userWithoutPassword } = req.user!;
+    res.json(userWithoutPassword);
+  });
+
+  app.get("/api/user-by-username", async (req, res) => {
+    try {
+      const username = req.query.username as string;
+      if (!username) {
+        return res.status(400).send("Username required");
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).send("User not found");
+      }
+
+      // Only return email and username for lookup
+      res.json({ email: user.email, username: user.username });
+    } catch (error: any) {
+      res.status(500).send("Lookup failed");
     }
   });
 
