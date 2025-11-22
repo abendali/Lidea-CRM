@@ -48,6 +48,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   profilePicture: text("profile_picture"),
+  role: text("role", { enum: ['Admin', 'Confirmateur', 'Store Manager'] }).notNull().default('Store Manager'),
 });
 
 export const workshopOrders = pgTable("workshop_orders", {
@@ -115,6 +116,7 @@ export const insertUserSchema = createInsertSchema(users, {
   password: z.string().min(6),
   name: z.string().min(1).max(100).optional(),
   profilePicture: z.string().url().optional().or(z.literal('')),
+  role: z.enum(['Admin', 'Confirmateur', 'Store Manager']).optional(),
 }).omit({
   id: true,
 });
@@ -146,6 +148,7 @@ export const updateUserSchema = z.object({
   password: z.string().min(6).optional(),
   name: z.string().min(1).max(100).optional(),
   profilePicture: z.string().url().optional().or(z.literal('')),
+  role: z.enum(['Admin', 'Confirmateur', 'Store Manager']).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
