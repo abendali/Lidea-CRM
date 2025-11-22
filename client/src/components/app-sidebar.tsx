@@ -1,4 +1,4 @@
-import { Home, Package, DollarSign, Settings, LogOut, ClipboardList, Search } from "lucide-react";
+import { Home, Package, DollarSign, Settings, LogOut, ClipboardList, Search, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -38,6 +38,11 @@ const items = [
     title: "Workshop Orders",
     url: "/workshop-orders",
     icon: ClipboardList,
+  },
+  {
+    title: "Users",
+    url: "/users",
+    icon: Users,
   },
 ];
 
