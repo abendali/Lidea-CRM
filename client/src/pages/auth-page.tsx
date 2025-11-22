@@ -1,26 +1,19 @@
 import { useState } from "react";
 import { Redirect } from "wouter";
-import { useAuth } from "@/hooks/use-supabase-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Store, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Store } from "lucide-react";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 import warehouseUrl from "@assets/image_1762252583003.png";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [loginData, setLoginData] = useState({ username: "", password: "" });
   const [registerData, setRegisterData] = useState({ username: "", email: "", password: "", name: "" });
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const { toast } = useToast();
 
   if (user) {
     return <Redirect to="/" />;
@@ -36,38 +29,10 @@ export default function AuthPage() {
     registerMutation.mutate(registerData);
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail);
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Password Reset Link Sent",
-        description: `If an account exists with ${resetEmail}, you will receive a password reset link.`,
-      });
-    }
-    setResetEmail("");
-    setForgotPasswordOpen(false);
-  };
-
   return (
     <div className="flex min-h-screen">
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {!isSupabaseConfigured && (
-            <Alert variant="destructive" className="mb-4" data-testid="alert-supabase-missing">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Configuration Required</AlertTitle>
-              <AlertDescription>
-                Supabase credentials are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables in your deployment settings.
-              </AlertDescription>
-            </Alert>
-          )}
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
@@ -83,29 +48,19 @@ export default function AuthPage() {
                 <CardContent>
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-email">Email</Label>
+                      <Label htmlFor="login-username">Username</Label>
                       <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                        id="login-username"
+                        type="text"
+                        placeholder="Enter your username"
+                        value={loginData.username}
+                        onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
                         required
-                        data-testid="input-login-email"
+                        data-testid="input-login-username"
                       />
                     </div>
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="login-password">Password</Label>
-                        <button
-                          type="button"
-                          onClick={() => setForgotPasswordOpen(true)}
-                          className="text-xs text-primary hover:underline"
-                          data-testid="link-forgot-password"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
+                      <Label htmlFor="login-password">Password</Label>
                       <Input
                         id="login-password"
                         type="password"
@@ -233,46 +188,6 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
-
-      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
-        <DialogContent data-testid="dialog-forgot-password">
-          <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
-            <DialogDescription>
-              Enter your email address and we'll send you a link to reset your password.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleForgotPassword}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="reset-email">Email Address</Label>
-                <Input
-                  id="reset-email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  required
-                  data-testid="input-reset-email"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setForgotPasswordOpen(false)}
-                data-testid="button-cancel-reset"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" data-testid="button-send-reset-link">
-                Send Reset Link
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
