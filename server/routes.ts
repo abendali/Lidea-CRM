@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema, insertProductStockSchema } from "@shared/schema";
+import { insertProductSchema, insertStockMovementSchema, insertCashflowSchema, insertWorkshopOrderSchema, updateUserSchema, insertProductStockSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, ensureAuthenticated, hashPassword } from "./auth";
+import { setupAuth, ensureAuthenticated, ensureAdmin, hashPassword } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -145,18 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User API
-  app.get("/api/users", ensureAuthenticated, async (req, res) => {
-    try {
-      const users = await storage.getAllUsers();
-      // Remove passwords from response
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-      res.json(usersWithoutPasswords);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
+  // User Profile API
   app.patch("/api/users/:id", ensureAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -187,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User Management API (Admin only)
-  app.get("/api/users", ensureAuthenticated, async (req, res) => {
+  app.get("/api/users", ensureAuthenticated, ensureAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       // Remove passwords from response
@@ -198,13 +187,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/users/:id", ensureAuthenticated, async (req, res) => {
+  app.post("/api/users", ensureAuthenticated, ensureAdmin, async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).send("Username already exists");
+      }
+
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(validatedData.email);
+      if (existingEmail) {
+        return res.status(400).send("Email already exists");
+      }
+
+      // Hash password and create user
+      const user = await storage.createUser({
+        ...validatedData,
+        password: await hashPassword(validatedData.password),
+      });
+
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/users/:id", ensureAuthenticated, ensureAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
       // Prevent users from deleting themselves
       if (id === req.user!.id) {
         return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+
+      // Check if user exists
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent deleting the last admin
+      if (userToDelete.role === "Admin") {
+        const allUsers = await storage.getAllUsers();
+        const adminCount = allUsers.filter(u => u.role === "Admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: "Cannot delete the last admin user" });
+        }
       }
       
       await storage.deleteUser(id);

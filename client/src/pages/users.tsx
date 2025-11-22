@@ -66,10 +66,7 @@ export default function Users() {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return await apiRequest("/api/register", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/users", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -91,9 +88,7 @@ export default function Users() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/users/${id}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/users/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -134,7 +129,7 @@ export default function Users() {
     createUserMutation.mutate(formData);
   };
 
-  const handleDeleteUser = (user: User) => {
+  const handleDeleteUser = (user: Omit<User, "password">) => {
     if (user.id === currentUser?.id) {
       toast({
         title: "Cannot delete",
@@ -143,7 +138,7 @@ export default function Users() {
       });
       return;
     }
-    setUserToDelete(user);
+    setUserToDelete(user as User);
   };
 
   const getRoleBadgeVariant = (role: string) => {

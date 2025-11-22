@@ -59,6 +59,19 @@ export function ensureAuthenticated(req: AuthRequest, res: Response, next: NextF
   }
 }
 
+// Admin authorization middleware
+export function ensureAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).send("Unauthorized");
+  }
+  
+  if (req.user.role !== "Admin") {
+    return res.status(403).send("Forbidden: Admin access required");
+  }
+  
+  next();
+}
+
 export async function setupAuth(app: Express) {
   app.post("/api/register", async (req, res) => {
     try {
