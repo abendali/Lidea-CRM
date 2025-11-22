@@ -1,12 +1,12 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext } from "react";
 import {
+  useQuery,
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -26,83 +26,41 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [localUser, setLocalUser] = useState<SelectUser | null>(null);
-  const [localLoading, setLocalLoading] = useState(true);
 
-  // Check for existing Supabase session on mount
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLocalLoading(false);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        // Fetch user data from our database
-        fetch("/api/user", {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        })
-          .then((res) => res.ok ? res.json() : null)
-          .then((user) => {
-            setLocalUser(user);
-            setLocalLoading(false);
-          })
-          .catch(() => setLocalLoading(false));
-      } else {
-        setLocalLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          fetch("/api/user", {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          })
-            .then((res) => res.ok ? res.json() : null)
-            .then((user) => setLocalUser(user))
-            .catch(() => setLocalUser(null));
-        } else {
-          setLocalUser(null);
+  // Fetch current user from cookie-based session
+  const { data: user = null, isLoading, error } = useQuery<SelectUser | null>({
+    queryKey: ["/api/user"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/user", {
+          credentials: "include",
+        });
+        if (!res.ok) {
+          if (res.status === 401) {
+            return null;
+          }
+          throw new Error("Failed to fetch user");
         }
+        return await res.json();
+      } catch (err) {
+        return null;
       }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      if (!isSupabaseConfigured) {
-        // Fallback to local auth
-        const res = await apiRequest("POST", "/api/login", credentials);
-        return await res.json();
-      }
-
-      // Look up email by username
-      const res = await fetch(`/api/user-by-username?username=${encodeURIComponent(credentials.username)}`);
-      if (!res.ok) throw new Error("Invalid credentials");
-      const userData = await res.json();
-
-      // Sign in with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: userData.email,
-        password: credentials.password,
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.session) throw new Error("Login failed");
-
-      return userData;
+      const res = await apiRequest("POST", "/api/login", credentials);
+      return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      setLocalUser(user);
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Welcome back!",
+        description: `Logged in as ${user.username}`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -115,28 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      if (!isSupabaseConfigured) {
-        // Fallback to local auth
-        const res = await apiRequest("POST", "/api/register", credentials);
-        return await res.json();
-      }
-
-      // Sign up with Supabase
-      const { data, error } = await supabase.auth.signUp({
-        email: credentials.email!,
-        password: credentials.password!,
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Registration failed");
-
-      // Create user in our database
       const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      setLocalUser(user);
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Account created!",
+        description: `Welcome ${user.username}`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -149,20 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      if (isSupabaseConfigured) {
-        await supabase.auth.signOut();
-      }
-      await apiRequest("POST", "/api/logout");
+      await apiRequest("POST", "/api/logout", {});
     },
     onSuccess: () => {
-      setLocalUser(null);
       queryClient.setQueryData(["/api/user"], null);
-    },
-    onError: (error: Error) => {
+      queryClient.clear();
       toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
+        title: "Logged out",
+        description: "You have been logged out successfully",
       });
     },
   });
@@ -170,9 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: localUser,
-        isLoading: localLoading,
-        error: null,
+        user,
+        isLoading,
+        error: error as Error | null,
         loginMutation,
         logoutMutation,
         registerMutation,
@@ -186,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }
