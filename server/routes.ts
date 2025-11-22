@@ -186,6 +186,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management API (Admin only)
+  app.get("/api/users", ensureAuthenticated, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/users/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Prevent users from deleting themselves
+      if (id === req.user!.id) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      
+      await storage.deleteUser(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Settings API
   app.get("/api/settings/:key", ensureAuthenticated, async (req, res) => {
     try {
