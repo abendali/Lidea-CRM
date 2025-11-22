@@ -27,11 +27,7 @@ export default function Settings() {
 
   const updateMutation = useMutation({
     mutationFn: async (updates: any) => {
-      return await apiRequest(`/api/users/${user?.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PATCH", `/api/users/${user?.id}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
