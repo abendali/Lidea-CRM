@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import logoUrl from "@assets/logo-lidea_1762250027138.png";
 
-const items = [
+const baseItems = [
   {
     title: "Dashboard",
     url: "/",
@@ -39,6 +39,9 @@ const items = [
     url: "/workshop-orders",
     icon: ClipboardList,
   },
+];
+
+const adminItems = [
   {
     title: "Users",
     url: "/users",
@@ -49,6 +52,10 @@ const items = [
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user, logoutMutation } = useAuth();
+  
+  const items = user?.role === "Admin" 
+    ? [...baseItems, ...adminItems] 
+    : baseItems;
 
   const handleLogout = () => {
     logoutMutation.mutate(undefined, {
