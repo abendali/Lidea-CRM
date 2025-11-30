@@ -73,43 +73,6 @@ export function ensureAdmin(req: AuthRequest, res: Response, next: NextFunction)
 }
 
 export async function setupAuth(app: Express) {
-  app.post("/api/register", async (req, res) => {
-    try {
-      const validatedData = insertUserSchema.parse(req.body);
-      
-      const existingUser = await storage.getUserByUsername(validatedData.username);
-      if (existingUser) {
-        return res.status(400).send("Username already exists");
-      }
-
-      const existingEmail = await storage.getUserByEmail(validatedData.email);
-      if (existingEmail) {
-        return res.status(400).send("Email already exists");
-      }
-
-      const user = await storage.createUser({
-        ...validatedData,
-        password: await hashPassword(validatedData.password),
-      });
-
-      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-      
-      res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: '/'
-      }));
-
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
-    } catch (error: any) {
-      console.error('Register error:', error);
-      res.status(400).send(error.message || "Invalid registration data");
-    }
-  });
-
   app.post("/api/login", async (req, res) => {
     try {
       const { username, password } = req.body;

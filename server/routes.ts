@@ -251,6 +251,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Edit user
+  app.patch("/api/admin/users/:id", ensureAuthenticated, ensureAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const userToUpdate = await storage.getUser(id);
+      if (!userToUpdate) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent admin from demoting themselves
+      if (id === req.user!.id && req.body.role && req.body.role !== "Admin") {
+        return res.status(400).json({ message: "You cannot demote yourself" });
+      }
+
+      // Check if changing role would leave no admins
+      if (userToUpdate.role === "Admin" && req.body.role && req.body.role !== "Admin") {
+        const allUsers = await storage.getAllUsers();
+        const adminCount = allUsers.filter(u => u.role === "Admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: "Cannot demote the last admin user" });
+        }
+      }
+
+      // Validate and extract allowed fields
+      const { name, username, email, role } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (username !== undefined) updates.username = username;
+      if (email !== undefined) updates.email = email;
+      if (role !== undefined) updates.role = role;
+
+      // Check for duplicate username/email
+      if (username && username !== userToUpdate.username) {
+        const existing = await storage.getUserByUsername(username);
+        if (existing) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      }
+      if (email && email !== userToUpdate.email) {
+        const existing = await storage.getUserByEmail(email);
+        if (existing) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+      }
+
+      const user = await storage.updateUser(id, updates);
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Reset user password
+  app.post("/api/admin/users/:id/reset-password", ensureAuthenticated, ensureAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const userToUpdate = await storage.getUser(id);
+      if (!userToUpdate) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get new password from request or generate one
+      let newPassword = req.body.password;
+      if (!newPassword) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        newPassword = '';
+        for (let i = 0; i < 12; i++) {
+          newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+      }
+
+      // Hash and save the new password
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(id, { password: hashedPassword });
+
+      res.json({ 
+        message: "Password reset successfully",
+        newPassword: newPassword 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Settings API
   app.get("/api/settings/:key", ensureAuthenticated, async (req, res) => {
     try {
