@@ -20,6 +20,12 @@ import {
   updateUserSchema, 
   insertProductStockSchema,
   type User as SelectUser,
+  type InsertUser,
+  type InsertStockMovement,
+  type InsertProductStock,
+  type InsertProduct,
+  type InsertCashflow,
+  type InsertWorkshopOrder,
   insertUserSchema
 } from "../../shared/schema";
 import { z } from "zod";
@@ -75,6 +81,19 @@ class DbStorage {
 
   async deleteProduct(id: number) {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async updateProductStockCount(id: number, newStock: number, modifiedBy: number) {
+    const result = await db
+      .update(products)
+      .set({ stock: newStock, modifiedBy })
+      .where(eq(products.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getStockMovementsByProduct(productId: number) {
+    return db.select().from(stockMovements).where(eq(stockMovements.productId, productId)).orderBy(desc(stockMovements.id));
   }
 
   async getAllStockMovements() {
@@ -142,6 +161,22 @@ class DbStorage {
     return result[0] || null;
   }
 
+  async getSetting(key: string) {
+    const result = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    return result[0];
+  }
+
+  async setSetting(key: string, value: string) {
+    const existing = await this.getSetting(key);
+    if (existing) {
+      const result = await db.update(settings).set({ value }).where(eq(settings.key, key)).returning();
+      return result[0];
+    } else {
+      const result = await db.insert(settings).values({ key, value }).returning();
+      return result[0];
+    }
+  }
+
   async updateSettings(newSettings: typeof settings.$inferInsert) {
     const existing = await this.getSettings();
     if (existing) {
@@ -151,6 +186,10 @@ class DbStorage {
       const result = await db.insert(settings).values(newSettings).returning();
       return result[0];
     }
+  }
+
+  async getAllUsers() {
+    return db.select().from(users).orderBy(desc(users.id));
   }
 
   async getUserByUsername(username: string) {
@@ -260,7 +299,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.post("/api/register", async (req, res) => {
   try {
-    const validatedData = insertUserSchema.parse(req.body);
+    const validatedData = insertUserSchema.parse(req.body) as InsertUser;
     
     const existingUser = await storage.getUserByUsername(validatedData.username);
     if (existingUser) {
@@ -505,8 +544,11 @@ app.get("/api/products/:id", authenticateToken, async (req: AuthRequest, res) =>
 
 app.post("/api/products", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = insertProductSchema.parse(req.body);
-    const product = await storage.createProduct(validatedData);
+    const validatedData = insertProductSchema.parse(req.body) as InsertProduct;
+    const product = await storage.createProduct({
+      ...validatedData,
+      createdBy: req.user!.id,
+    });
     res.status(201).json(product);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -550,21 +592,32 @@ app.get("/api/stock-movements", authenticateToken, async (req: AuthRequest, res)
 
 app.post("/api/stock-movements", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = insertStockMovementSchema.parse(req.body);
-    const movement = await storage.createStockMovement(validatedData);
+    const validatedData = insertStockMovementSchema.parse(req.body) as InsertStockMovement;
     
-    const stock = await storage.getProductStockByProductId(validatedData.productId);
-    if (stock) {
-      const newQuantity = validatedData.type === 'in' 
-        ? stock.quantity + validatedData.quantity 
-        : stock.quantity - validatedData.quantity;
-      await storage.updateProductStockByProductId(validatedData.productId, { quantity: newQuantity });
-    } else {
-      await storage.createProductStock({
-        productId: validatedData.productId,
-        quantity: validatedData.type === 'in' ? validatedData.quantity : 0,
-      });
+    const product = await storage.getProduct(validatedData.productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    let newStock = product.stock;
+    const movementType = validatedData.type;
+    const quantity = validatedData.quantity;
+    
+    if (movementType === 'add') {
+      newStock += quantity;
+    } else {
+      newStock -= quantity;
+    }
+
+    if (newStock < 0) {
+      return res.status(400).json({ message: "Insufficient stock" });
+    }
+
+    const movement = await storage.createStockMovement({
+      ...validatedData,
+      createdBy: req.user!.id,
+    });
+    await storage.updateProductStockCount(validatedData.productId, newStock, req.user!.id);
     
     res.status(201).json(movement);
   } catch (error: any) {
@@ -583,8 +636,11 @@ app.get("/api/cashflows", authenticateToken, async (req: AuthRequest, res) => {
 
 app.post("/api/cashflows", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = insertCashflowSchema.parse(req.body);
-    const cashflow = await storage.createCashflow(validatedData);
+    const validatedData = insertCashflowSchema.parse(req.body) as InsertCashflow;
+    const cashflow = await storage.createCashflow({
+      ...validatedData,
+      createdBy: req.user!.id,
+    });
     res.status(201).json(cashflow);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -628,8 +684,11 @@ app.get("/api/workshop-orders", authenticateToken, async (req: AuthRequest, res)
 
 app.post("/api/workshop-orders", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = insertWorkshopOrderSchema.parse(req.body);
-    const order = await storage.createWorkshopOrder(validatedData);
+    const validatedData = insertWorkshopOrderSchema.parse(req.body) as InsertWorkshopOrder;
+    const order = await storage.createWorkshopOrder({
+      ...validatedData,
+      createdBy: req.user!.id,
+    });
     res.status(201).json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -691,8 +750,21 @@ app.get("/api/product-stock", authenticateToken, async (req: AuthRequest, res) =
 
 app.post("/api/product-stock", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = insertProductStockSchema.parse(req.body);
-    const stock = await storage.createProductStock(validatedData);
+    const validatedData = insertProductStockSchema.parse(req.body) as InsertProductStock;
+    
+    const product = await storage.getProduct(validatedData.productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const stock = await storage.createProductStock({
+      ...validatedData,
+      createdBy: req.user!.id,
+    });
+
+    const newTotalStock = product.stock + validatedData.quantity;
+    await storage.updateProductStockCount(validatedData.productId, newTotalStock, req.user!.id);
+
     res.status(201).json(stock);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -708,16 +780,94 @@ app.patch("/api/product-stock/:productId", authenticateToken, async (req: AuthRe
       return res.status(400).json({ message: "Quantity must be a number" });
     }
     
-    const stock = await storage.getProductStockByProductId(productId);
-    if (stock) {
-      const updatedStock = await storage.updateProductStockByProductId(productId, { quantity });
-      res.json(updatedStock);
-    } else {
-      const newStock = await storage.createProductStock({ productId, quantity });
-      res.status(201).json(newStock);
+    const product = await storage.getProduct(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    const updatedProduct = await storage.updateProductStockCount(productId, quantity, req.user!.id);
+    res.json(updatedProduct);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// Users API
+app.get("/api/users", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const usersData = await storage.getAllUsers();
+    const usersWithoutPasswords = usersData.map(({ password, ...user }) => user);
+    res.json(usersWithoutPasswords);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Settings by key API
+app.get("/api/settings/:key", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const setting = await storage.getSetting(req.params.key);
+    
+    if (!setting) {
+      return res.status(404).json({ message: "Setting not found" });
+    }
+    
+    res.json(setting);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/settings", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { key, value } = req.body;
+    
+    if (!key || value === undefined) {
+      return res.status(400).json({ message: "Key and value are required" });
+    }
+    
+    const setting = await storage.setSetting(key, value);
+    res.json(setting);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Dashboard stats endpoint
+app.get("/api/dashboard/stats", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const productsData = await storage.getAllProducts();
+    const cashflowsData = await storage.getAllCashflows();
+    const initialCapitalSetting = await storage.getSetting('initial_capital');
+    
+    const totalProducts = productsData.length;
+    const totalStock = productsData.reduce((sum, p) => sum + (p.stock || 0), 0);
+    const totalStockValue = productsData.reduce((sum, p) => sum + ((p.estimatedPrice || 0) * (p.stock || 0)), 0);
+    const lowStockCount = productsData.filter(p => (p.stock || 0) < 10).length;
+    
+    const totalIncome = cashflowsData
+      .filter(c => c.type === 'income')
+      .reduce((sum, c) => sum + c.amount, 0);
+    const totalExpense = cashflowsData
+      .filter(c => c.type === 'expense')
+      .reduce((sum, c) => sum + c.amount, 0);
+    const netBalance = totalIncome - totalExpense;
+    const initialCapital = initialCapitalSetting ? parseFloat(initialCapitalSetting.value) : 0;
+    const currentCapital = initialCapital + netBalance;
+    
+    res.json({
+      totalProducts,
+      totalStock,
+      totalStockValue,
+      lowStockCount,
+      totalIncome,
+      totalExpense,
+      netBalance,
+      initialCapital,
+      currentCapital,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 });
 
