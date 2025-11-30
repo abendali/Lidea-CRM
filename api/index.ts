@@ -20,6 +20,9 @@ import {
   updateUserSchema, 
   insertProductStockSchema,
   type User as SelectUser,
+  type InsertUser,
+  type InsertStockMovement,
+  type InsertProductStock,
   insertUserSchema
 } from "../shared/schema";
 import { z } from "zod";
@@ -314,7 +317,7 @@ async function initializeApp() {
     // Auth routes
     app.post("/api/register", async (req, res) => {
       try {
-        const validatedData = insertUserSchema.parse(req.body);
+        const validatedData = insertUserSchema.parse(req.body) as InsertUser;
         
         const existingUser = await storage.getUserByUsername(validatedData.username);
         if (existingUser) {
@@ -604,7 +607,7 @@ async function initializeApp() {
 
     app.post("/api/stock-movements", authenticateToken, async (req: AuthRequest, res) => {
       try {
-        const validatedData = insertStockMovementSchema.parse(req.body);
+        const validatedData = insertStockMovementSchema.parse(req.body) as InsertStockMovement;
         
         const product = await storage.getProduct(validatedData.productId);
         if (!product) {
@@ -818,7 +821,7 @@ async function initializeApp() {
 
     app.post("/api/product-stock", authenticateToken, async (req: AuthRequest, res) => {
       try {
-        const validatedData = insertProductStockSchema.parse(req.body);
+        const validatedData = insertProductStockSchema.parse(req.body) as InsertProductStock;
         
         const product = await storage.getProduct(validatedData.productId);
         if (!product) {
