@@ -95,12 +95,18 @@ export default function CashflowPage() {
         description: "Initial capital has been updated successfully.",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      const isAuthError = error.message.includes('401');
       toast({
-        title: "Error",
-        description: "Failed to update capital.",
+        title: isAuthError ? "Session expired" : "Error",
+        description: isAuthError 
+          ? "Please log in again to continue." 
+          : "Failed to update capital.",
         variant: "destructive",
       });
+      if (isAuthError) {
+        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      }
     },
   });
 
